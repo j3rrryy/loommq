@@ -106,11 +106,16 @@ public final class YamlUserStore implements UserStore {
 
     }
 
-    private record UserEntry(String username, String password, List<PermissionEntry> permissions) {
+    private record UserEntry(
+            @JsonProperty("username") String username,
+            @JsonProperty("password") String password,
+            @JsonProperty("permissions") List<PermissionEntry> permissions) {
 
     }
 
-    private record PermissionEntry(String action, String topic) {
+    private record PermissionEntry(
+            @JsonProperty("action") String action,
+            @JsonProperty("topic") String topic) {
 
     }
 

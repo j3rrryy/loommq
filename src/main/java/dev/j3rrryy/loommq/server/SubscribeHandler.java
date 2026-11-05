@@ -19,10 +19,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubscribeMessage> {
 
-    private static final int REASON_ERROR_THRESHOLD = 0x80;
-    private static final int REASON_NOT_AUTHORIZED = 0x87;
-    private static final int REASON_TOPIC_FILTER_INVALID = 0x8F;
-
     private final SubscriptionRegistry registry;
     private final AtomicInteger packetIdGenerator = new AtomicInteger(1);
 
@@ -39,7 +35,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
 
             if (!TopicFilterValidator.isValid(requested)) {
                 log.warn("Invalid filter '{}' from {}", requested, ctx.channel().remoteAddress());
-                reasonCodes.add(REASON_TOPIC_FILTER_INVALID);
+                reasonCodes.add((int) MqttReasonCodes.SubAck.TOPIC_FILTER_INVALID.byteValue());
                 grantedFilters.add(null);
                 continue;
             }
@@ -50,7 +46,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
             if (user == null || !user.canSubscribe(actual)) {
                 log.warn("User '{}' not authorized to subscribe to '{}'",
                         user != null ? user.username() : "unknown", requested);
-                reasonCodes.add(REASON_NOT_AUTHORIZED);
+                reasonCodes.add((int) MqttReasonCodes.SubAck.NOT_AUTHORIZED.byteValue());
                 grantedFilters.add(null);
                 continue;
             }
@@ -63,7 +59,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
         ctx.writeAndFlush(buildSubAck(packetId, reasonCodes));
 
         for (int i = 0; i < grantedFilters.size(); i++) {
-            if (grantedFilters.get(i) != null && reasonCodes.get(i) < REASON_ERROR_THRESHOLD) {
+            if (grantedFilters.get(i) != null && reasonCodes.get(i) < 0x80) {
                 sendRetainedMessages(ctx, grantedFilters.get(i));
             }
         }
