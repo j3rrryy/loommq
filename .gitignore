@@ -6,6 +6,7 @@ build/
 .kotlin
 users.yaml
 config.yaml
+wal.log
 
 ### IntelliJ IDEA ###
 .idea/

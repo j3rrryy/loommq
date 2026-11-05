@@ -7,6 +7,8 @@ import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.config.ConfigLoader;
 import dev.j3rrryy.loommq.server.MqttServer;
+import dev.j3rrryy.loommq.wal.FileWal;
+import dev.j3rrryy.loommq.wal.Wal;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
@@ -17,6 +19,7 @@ public final class Application implements AutoCloseable {
 
     private final MqttServer server;
     private final ConnectionRateLimiter rateLimiter;
+    private final Wal wal;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     public Application(Path configPath) {
@@ -24,15 +27,25 @@ public final class Application implements AutoCloseable {
         UserStore userStore = new YamlUserStore(config.usersFile());
         this.rateLimiter = new ConnectionRateLimiter(config.rateLimit());
         SubscriptionRegistry registry = new SubscriptionRegistry();
-        this.server = new MqttServer(config, userStore, rateLimiter, registry);
+        this.wal = new FileWal(Path.of("wal.log"));
+        this.server = new MqttServer(config, userStore, rateLimiter, registry, wal);
     }
 
-    public int run() throws InterruptedException {
+    public int run() {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close, "loommq-shutdown"));
-        log.info("Starting LoomMQ");
-        server.start();
-        server.awaitShutdown();
-        return 0;
+        try {
+            log.info("Starting LoomMQ");
+            server.start();
+            server.awaitShutdown();
+            return 0;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.info("LoomMQ interrupted, shutting down");
+            return 0;
+        } catch (Exception e) {
+            log.error("Failed to start LoomMQ: {}", e.getMessage());
+            return 1;
+        }
     }
 
     @Override
@@ -40,6 +53,7 @@ public final class Application implements AutoCloseable {
         if (isClosed.compareAndSet(false, true)) {
             server.stop();
             rateLimiter.close();
+            wal.close();
         }
     }
 

@@ -5,6 +5,7 @@ import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.server.handler.*;
+import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -23,6 +24,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
     private final SubscriptionRegistry registry;
+    private final Wal wal;
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -33,8 +35,8 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
         pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter));
         pipeline.addLast("qos2Handler", qos2Handler);
-        pipeline.addLast("publishHandler", new PublishHandler(registry, qos2Handler));
-        pipeline.addLast("subscribeHandler", new SubscribeHandler(registry));
+        pipeline.addLast("publishHandler", new PublishHandler(registry, qos2Handler, wal));
+        pipeline.addLast("subscribeHandler", new SubscribeHandler(registry, wal));
         pipeline.addLast("unsubscribeHandler", new UnsubscribeHandler(registry));
         pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry));
     }

@@ -18,7 +18,7 @@ public final class CliOptions implements Callable<Integer> {
     private Path configPath;
 
     @Override
-    public Integer call() throws Exception {
+    public Integer call() {
         try (Application app = new Application(configPath)) {
             return app.run();
         }

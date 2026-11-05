@@ -2,11 +2,10 @@ package dev.j3rrryy.loommq.server.handler;
 
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
-import dev.j3rrryy.loommq.broker.Delivery;
-import dev.j3rrryy.loommq.broker.RetainedMessage;
-import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.*;
 import dev.j3rrryy.loommq.broker.topic.TopicValidator;
 import dev.j3rrryy.loommq.server.NetworkUtils;
+import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -23,6 +22,7 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
 
     private final SubscriptionRegistry registry;
     private final Qos2Handler qos2Handler;
+    private final Wal wal;
     private final AtomicInteger outboundPacketIdGenerator = new AtomicInteger(1);
 
     @Override
@@ -55,6 +55,12 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
             return;
         }
 
+        byte[] payloadBytes = new byte[msg.payload().readableBytes()];
+        msg.payload().getBytes(msg.payload().readerIndex(), payloadBytes);
+
+        WalMessage walMessage = new WalMessage(topic, payloadBytes);
+        wal.append(walMessage.toBytes());
+
         if (retain) {
             if (msg.payload().readableBytes() == 0) {
                 registry.clearRetained(topic);
@@ -69,11 +75,9 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         for (Delivery target : targets) {
             int targetQos = target.qos();
             int outId = targetQos > 0 ? nextPacketId() : -1;
-
             if (targetQos == 2) {
                 qos2Handler.trackOutbound(outId);
             }
-
             sendToSubscriber(target, topic, msg.payload(), retain, outId);
         }
 
