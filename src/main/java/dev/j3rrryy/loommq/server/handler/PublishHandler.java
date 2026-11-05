@@ -6,6 +6,7 @@ import dev.j3rrryy.loommq.broker.Delivery;
 import dev.j3rrryy.loommq.broker.RetainedMessage;
 import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.topic.TopicValidator;
+import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -21,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublishMessage> {
 
     private final SubscriptionRegistry registry;
+    private final Qos2Handler qos2Handler;
     private final AtomicInteger outboundPacketIdGenerator = new AtomicInteger(1);
 
     @Override
@@ -31,8 +33,17 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         boolean retain = msg.fixedHeader().isRetain();
         int packetId = msg.variableHeader().packetId();
 
+        if (qos == 2) {
+            if (qos2Handler.isIncomingDuplicate(packetId)) {
+                sendPubRec(ctx, packetId);
+                return;
+            }
+            qos2Handler.registerIncoming(packetId);
+            sendPubRec(ctx, packetId);
+        }
+
         if (!TopicValidator.isValid(topic)) {
-            log.warn("Invalid PUBLISH topic '{}' from {}", topic, ctx.channel().remoteAddress());
+            log.warn("Invalid PUBLISH topic '{}' from {}", topic, NetworkUtils.remoteAddress(ctx.channel()));
             sendError(ctx, qos, packetId, MqttReasonCodes.PubAck.TOPIC_NAME_INVALID.byteValue());
             return;
         }
@@ -56,7 +67,14 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
 
         List<Delivery> targets = registry.findTargets(topic, qos);
         for (Delivery target : targets) {
-            sendToSubscriber(target, topic, msg.payload(), retain);
+            int targetQos = target.qos();
+            int outId = targetQos > 0 ? nextPacketId() : -1;
+
+            if (targetQos == 2) {
+                qos2Handler.trackOutbound(outId);
+            }
+
+            sendToSubscriber(target, topic, msg.payload(), retain, outId);
         }
 
         if (qos == 1) {
@@ -68,7 +86,16 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         }
     }
 
-    private void sendToSubscriber(Delivery target, String topic, ByteBuf payload, boolean retain) {
+    private void sendPubRec(ChannelHandlerContext ctx, int packetId) {
+        MqttMessage pubRec = MqttMessageFactory.newMessage(
+                new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.AT_MOST_ONCE, false, 2),
+                MqttMessageIdVariableHeader.from(packetId),
+                null
+        );
+        ctx.writeAndFlush(pubRec);
+    }
+
+    private void sendToSubscriber(Delivery target, String topic, ByteBuf payload, boolean retain, int packetId) {
         int targetQos = target.qos();
         MqttMessageBuilders.PublishBuilder builder = MqttMessageBuilders.publish()
                 .topicName(topic)
@@ -76,8 +103,8 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                 .retained(retain)
                 .payload(payload.retainedDuplicate());
 
-        if (targetQos > 0) {
-            builder.messageId(nextPacketId());
+        if (targetQos > 0 && packetId != -1) {
+            builder.messageId(packetId);
         }
 
         target.channel().writeAndFlush(builder.build());

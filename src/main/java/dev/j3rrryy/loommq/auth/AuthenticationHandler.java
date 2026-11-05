@@ -1,5 +1,6 @@
 package dev.j3rrryy.loommq.auth;
 
+import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
@@ -63,7 +64,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
 
     private void onAuthenticated(ChannelHandlerContext ctx, User user) {
         ctx.channel().attr(USER_KEY).set(user);
-        log.info("Authenticated user={} from {}", user.username(), ctx.channel().remoteAddress());
+        log.info("Authenticated user={} from {}", user.username(), NetworkUtils.remoteAddress(ctx.channel()));
 
         MqttMessage connAck = MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
@@ -75,7 +76,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     }
 
     private void reject(ChannelHandlerContext ctx, MqttConnectReturnCode code) {
-        log.warn("Rejected CONNECT from {}: {}", ctx.channel().remoteAddress(), code);
+        log.warn("Rejected CONNECT from {}: {}", NetworkUtils.remoteAddress(ctx.channel()), code);
         MqttMessage connAck = MqttMessageBuilders.connAck()
                 .returnCode(code)
                 .sessionPresent(false)

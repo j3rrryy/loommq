@@ -5,6 +5,7 @@ import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
+import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
@@ -34,7 +35,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
             int qos = sub.qualityOfService().value();
 
             if (!TopicFilterValidator.isValid(requested)) {
-                log.warn("Invalid filter '{}' from {}", requested, ctx.channel().remoteAddress());
+                log.warn("Invalid filter '{}' from {}", requested, NetworkUtils.remoteAddress(ctx.channel()));
                 reasonCodes.add((int) MqttReasonCodes.SubAck.TOPIC_FILTER_INVALID.byteValue());
                 grantedFilters.add(null);
                 continue;
@@ -53,7 +54,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
 
             registry.subscribe(ctx.channel(), requested, qos, shareGroup);
             reasonCodes.add(qos);
-            grantedFilters.add(actual);
+            grantedFilters.add(shareGroup == null ? actual : null);
         }
 
         ctx.writeAndFlush(buildSubAck(packetId, reasonCodes));
@@ -73,7 +74,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
                     .topicName(delivery.topic())
                     .retained(true)
                     .qos(MqttQoS.valueOf(qos))
-                    .payload(delivery.message().payload());
+                    .payload(delivery.message().payload().retainedDuplicate());
 
             if (qos > 0) {
                 builder.messageId(nextPacketId());
@@ -81,6 +82,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
 
             MqttPublishMessage pub = builder.build();
             ctx.write(pub);
+            delivery.message().release();
         }
         if (!retained.isEmpty()) {
             ctx.flush();

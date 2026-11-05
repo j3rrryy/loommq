@@ -26,12 +26,14 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
 
     @Override
     protected void initChannel(SocketChannel ch) {
+        Qos2Handler qos2Handler = new Qos2Handler();
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast("idleState", new IdleStateHandler(0, 0, IDLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
         pipeline.addLast("mqttDecoder", new MqttDecoder());
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
         pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter));
-        pipeline.addLast("publishHandler", new PublishHandler(registry));
+        pipeline.addLast("qos2Handler", qos2Handler);
+        pipeline.addLast("publishHandler", new PublishHandler(registry, qos2Handler));
         pipeline.addLast("subscribeHandler", new SubscribeHandler(registry));
         pipeline.addLast("unsubscribeHandler", new UnsubscribeHandler(registry));
         pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry));
