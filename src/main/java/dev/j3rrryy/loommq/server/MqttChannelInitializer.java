@@ -1,0 +1,25 @@
+package dev.j3rrryy.loommq.server;
+
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.mqtt.MqttDecoder;
+import io.netty.handler.codec.mqtt.MqttEncoder;
+import io.netty.handler.timeout.IdleStateHandler;
+
+import java.util.concurrent.TimeUnit;
+
+public final class MqttChannelInitializer extends ChannelInitializer<SocketChannel> {
+
+    private static final int IDLE_TIMEOUT_SECONDS = 120;
+
+    @Override
+    protected void initChannel(SocketChannel ch) {
+        ChannelPipeline pipeline = ch.pipeline();
+        pipeline.addLast("idleState", new IdleStateHandler(0, 0, IDLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
+        pipeline.addLast("mqttDecoder", new MqttDecoder());
+        pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
+        pipeline.addLast("mqttHandler", new MqttConnectionHandler());
+    }
+
+}

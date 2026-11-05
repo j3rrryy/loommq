@@ -1,0 +1,34 @@
+package dev.j3rrryy.loommq;
+
+import dev.j3rrryy.loommq.config.Config;
+import dev.j3rrryy.loommq.server.MqttServer;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+@Slf4j
+public final class Application implements AutoCloseable {
+
+    private final MqttServer server;
+    private final AtomicBoolean isClosed = new AtomicBoolean(false);
+
+    public Application(Config config) {
+        this.server = new MqttServer(config);
+    }
+
+    public int run() throws InterruptedException {
+        Runtime.getRuntime().addShutdownHook(new Thread(this::close, "loommq-shutdown"));
+        log.info("Starting LoomMQ");
+        server.start();
+        server.awaitShutdown();
+        return 0;
+    }
+
+    @Override
+    public void close() {
+        if (isClosed.compareAndSet(false, true)) {
+            server.stop();
+        }
+    }
+
+}
