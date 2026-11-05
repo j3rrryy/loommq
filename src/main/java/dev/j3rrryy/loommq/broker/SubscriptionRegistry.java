@@ -1,6 +1,7 @@
 package dev.j3rrryy.loommq.broker;
 
-import dev.j3rrryy.loommq.auth.TopicMatcher;
+import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
+import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
 import io.netty.channel.Channel;
 
 import java.util.*;

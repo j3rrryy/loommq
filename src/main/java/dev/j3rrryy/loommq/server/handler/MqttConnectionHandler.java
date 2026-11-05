@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.server;
+package dev.j3rrryy.loommq.server.handler;
 
 import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import io.netty.channel.Channel;

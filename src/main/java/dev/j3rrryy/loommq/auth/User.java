@@ -1,5 +1,7 @@
 package dev.j3rrryy.loommq.auth;
 
+import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
+
 import java.util.List;
 
 public record User(String username, String passwordHash, List<Permission> permissions) {

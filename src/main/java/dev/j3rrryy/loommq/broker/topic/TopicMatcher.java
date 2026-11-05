@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.auth;
+package dev.j3rrryy.loommq.broker.topic;
 
 public final class TopicMatcher {
 

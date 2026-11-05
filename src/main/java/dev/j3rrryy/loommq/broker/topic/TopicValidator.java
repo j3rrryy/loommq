@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.topic;
 
 import java.nio.charset.StandardCharsets;
 

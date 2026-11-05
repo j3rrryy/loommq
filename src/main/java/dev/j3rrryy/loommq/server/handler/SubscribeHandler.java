@@ -1,10 +1,10 @@
-package dev.j3rrryy.loommq.server;
+package dev.j3rrryy.loommq.server.handler;
 
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
-import dev.j3rrryy.loommq.broker.TopicFilterValidator;
+import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
