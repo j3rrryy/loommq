@@ -7,6 +7,7 @@ import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -16,11 +17,25 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     public static final AttributeKey<User> USER_KEY = AttributeKey.valueOf("loommq.user");
 
     private final UserStore userStore;
+    private final ConnectionRateLimiter rateLimiter;
+
+    private static String getIp(ChannelHandlerContext ctx) {
+        if (ctx.channel().remoteAddress() instanceof InetSocketAddress inet) {
+            return inet.getAddress().getHostAddress();
+        }
+        return "unknown";
+    }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
         if (msg.fixedHeader().messageType() != MqttMessageType.CONNECT) {
             ctx.fireChannelRead(msg);
+            return;
+        }
+
+        String ip = getIp(ctx);
+        if (!rateLimiter.isAllowed(ip)) {
+            reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_BUSY);
             return;
         }
 
@@ -35,8 +50,14 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         String password = passwordBytes == null ? null : new String(passwordBytes, StandardCharsets.UTF_8);
 
         userStore.authenticate(username, password).ifPresentOrElse(
-                user -> onAuthenticated(ctx, user),
-                () -> reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD)
+                user -> {
+                    rateLimiter.recordSuccess(ip);
+                    onAuthenticated(ctx, user);
+                },
+                () -> {
+                    rateLimiter.recordFailure(ip);
+                    reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
+                }
         );
     }
 

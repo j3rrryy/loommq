@@ -15,7 +15,8 @@ public final class ConfigLoader {
         return new Config(
                 parsed.host() != null ? parsed.host() : defaults.host(),
                 parsed.port() != 0 ? parsed.port() : defaults.port(),
-                parsed.usersFile() != null ? parsed.usersFile() : defaults.usersFile()
+                parsed.usersFile() != null ? parsed.usersFile() : defaults.usersFile(),
+                parsed.rateLimit() != null ? parsed.rateLimit() : defaults.rateLimit()
         );
     }
 

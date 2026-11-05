@@ -1,6 +1,7 @@
 package dev.j3rrryy.loommq.server;
 
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
+import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -18,6 +19,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
     private static final int IDLE_TIMEOUT_SECONDS = 120;
 
     private final UserStore userStore;
+    private final ConnectionRateLimiter rateLimiter;
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -25,7 +27,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         pipeline.addLast("idleState", new IdleStateHandler(0, 0, IDLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
         pipeline.addLast("mqttDecoder", new MqttDecoder());
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
-        pipeline.addLast("authentication", new AuthenticationHandler(userStore));
+        pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter));
         pipeline.addLast("mqttHandler", new MqttConnectionHandler());
     }
 

@@ -25,6 +25,9 @@ public final class YamlUserStore implements UserStore {
     private static final int HASH_LENGTH = 32;
     private static final int SALT_LENGTH = 16;
 
+    private static final String BOOTSTRAP_USER_ENV = "LOOMMQ_BOOTSTRAP_ADMIN_USERNAME";
+    private static final String BOOTSTRAP_PASS_ENV = "LOOMMQ_BOOTSTRAP_ADMIN_PASSWORD";
+
     private static final Argon2Function ARGON2 = Argon2Function.getInstance(
             MEMORY_KB, ITERATIONS, PARALLELISM, HASH_LENGTH, Argon2.ID);
 
@@ -39,12 +42,12 @@ public final class YamlUserStore implements UserStore {
 
     private static Map<String, User> load(Path path) {
         if (!Files.exists(path)) {
-            throw new IllegalStateException("Users file not found: " + path);
+            return bootstrapAdmin();
         }
         try {
             UsersFile file = YAML.readValue(path.toFile(), UsersFile.class);
             if (file.users() == null || file.users().isEmpty()) {
-                throw new IllegalStateException("Users file is empty: " + path);
+                return bootstrapAdmin();
             }
             return file.users().stream()
                     .map(YamlUserStore::toUser)
@@ -52,6 +55,24 @@ public final class YamlUserStore implements UserStore {
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to load users from " + path, e);
         }
+    }
+
+    private static Map<String, User> bootstrapAdmin() {
+        String password = System.getenv(BOOTSTRAP_PASS_ENV);
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException(
+                    "Users file is empty and " + BOOTSTRAP_PASS_ENV + " is not set");
+        }
+
+        String username = System.getenv(BOOTSTRAP_USER_ENV);
+        if (username == null || username.isBlank()) {
+            username = "admin";
+        }
+        log.warn("Bootstrapping '{}' user from environment variables", username);
+
+        String hash = Password.hash(password).addRandomSalt(SALT_LENGTH).with(ARGON2).getResult();
+        User admin = new User(username, hash, List.of(new Permission(Permission.Action.ALL, "#")));
+        return Map.of(username, admin);
     }
 
     private static User toUser(UserEntry entry) {
