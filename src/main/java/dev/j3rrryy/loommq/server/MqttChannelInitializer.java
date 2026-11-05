@@ -3,6 +3,7 @@ package dev.j3rrryy.loommq.server;
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
+import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -20,6 +21,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
 
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
+    private final SubscriptionRegistry registry;
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -28,6 +30,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         pipeline.addLast("mqttDecoder", new MqttDecoder());
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
         pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter));
+        pipeline.addLast("subscribeHandler", new SubscribeHandler(registry));
         pipeline.addLast("mqttHandler", new MqttConnectionHandler());
     }
 

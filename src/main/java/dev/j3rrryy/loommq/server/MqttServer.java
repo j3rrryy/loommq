@@ -2,6 +2,7 @@ package dev.j3rrryy.loommq.server;
 
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
+import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -26,6 +27,8 @@ public final class MqttServer {
     private final Config config;
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
+    private final SubscriptionRegistry registry;
+
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
@@ -67,7 +70,7 @@ public final class MqttServer {
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childHandler(new MqttChannelInitializer(userStore, rateLimiter));
+                .childHandler(new MqttChannelInitializer(userStore, rateLimiter, registry));
 
         serverChannel = bootstrap.bind(config.host(), config.port()).sync().channel();
         log.info("LoomMQ listening on {}:{}", config.host(), config.port());

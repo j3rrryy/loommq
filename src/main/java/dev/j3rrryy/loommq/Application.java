@@ -3,6 +3,7 @@ package dev.j3rrryy.loommq;
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.auth.YamlUserStore;
+import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.config.ConfigLoader;
 import dev.j3rrryy.loommq.server.MqttServer;
@@ -22,7 +23,8 @@ public final class Application implements AutoCloseable {
         Config config = new ConfigLoader().load(configPath);
         UserStore userStore = new YamlUserStore(config.usersFile());
         this.rateLimiter = new ConnectionRateLimiter(config.rateLimit());
-        this.server = new MqttServer(config, userStore, rateLimiter);
+        SubscriptionRegistry registry = new SubscriptionRegistry();
+        this.server = new MqttServer(config, userStore, rateLimiter, registry);
     }
 
     public int run() throws InterruptedException {
