@@ -1,5 +1,6 @@
 package dev.j3rrryy.loommq.server;
 
+import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.config.Config;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public final class MqttServer {
 
     private final Config config;
+    private final UserStore userStore;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
@@ -63,10 +65,10 @@ public final class MqttServer {
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childHandler(new MqttChannelInitializer());
+                .childHandler(new MqttChannelInitializer(userStore));
 
         serverChannel = bootstrap.bind(config.host(), config.port()).sync().channel();
-        log.info("LoomMQ listening on {}", serverChannel.localAddress());
+        log.info("LoomMQ listening on {}:{}", config.host(), config.port());
     }
 
     public void awaitShutdown() throws InterruptedException {

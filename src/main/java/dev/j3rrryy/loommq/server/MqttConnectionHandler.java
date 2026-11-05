@@ -25,10 +25,9 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
         switch (msg.fixedHeader().messageType()) {
-            case CONNECT -> onConnect(ctx, (MqttConnectMessage) msg);
             case PINGREQ -> ctx.writeAndFlush(PINGRESP);
             case DISCONNECT -> ctx.close();
-            default -> log.warn("Unsupported message type from {}: {}",
+            default -> log.debug("Unhandled message type from {}: {}",
                     ctx.channel().remoteAddress(), msg.fixedHeader().messageType());
         }
     }
@@ -45,17 +44,6 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         log.warn("Exception on channel {}", ctx.channel().remoteAddress(), cause);
         ctx.close();
-    }
-
-    private void onConnect(ChannelHandlerContext ctx, MqttConnectMessage msg) {
-        MqttConnectPayload payload = msg.payload();
-        log.info("CONNECT clientId={} username={}", payload.clientIdentifier(), payload.userName());
-
-        MqttMessage connAck = MqttMessageBuilders.connAck()
-                .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
-                .sessionPresent(false)
-                .build();
-        ctx.writeAndFlush(connAck);
     }
 
 }

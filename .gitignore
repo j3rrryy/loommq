@@ -4,6 +4,8 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 .kotlin
+users.yaml
+config.yaml
 
 ### IntelliJ IDEA ###
 .idea/
