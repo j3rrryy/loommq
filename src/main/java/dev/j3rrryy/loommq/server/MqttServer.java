@@ -2,7 +2,7 @@ package dev.j3rrryy.loommq.server;
 
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
-import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.bootstrap.ServerBootstrap;

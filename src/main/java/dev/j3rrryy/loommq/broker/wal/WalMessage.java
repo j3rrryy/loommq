@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.wal;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;

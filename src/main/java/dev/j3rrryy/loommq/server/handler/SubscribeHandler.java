@@ -2,11 +2,11 @@ package dev.j3rrryy.loommq.server.handler;
 
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
-import dev.j3rrryy.loommq.broker.RetainedDelivery;
-import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
-import dev.j3rrryy.loommq.broker.WalMessage;
+import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
+import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
+import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.channel.ChannelHandlerContext;

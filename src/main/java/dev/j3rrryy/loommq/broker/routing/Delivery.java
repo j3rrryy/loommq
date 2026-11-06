@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.routing;
 
 import io.netty.channel.Channel;
 

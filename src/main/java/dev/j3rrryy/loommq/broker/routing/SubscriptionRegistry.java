@@ -1,5 +1,7 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.routing;
 
+import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
+import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
 import io.netty.channel.Channel;

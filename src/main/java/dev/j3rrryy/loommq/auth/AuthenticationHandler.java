@@ -1,6 +1,6 @@
 package dev.j3rrryy.loommq.auth;
 
-import dev.j3rrryy.loommq.broker.WillMessage;
+import dev.j3rrryy.loommq.broker.session.WillMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;

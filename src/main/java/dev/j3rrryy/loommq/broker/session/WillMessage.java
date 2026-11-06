@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.session;
 
 import io.netty.util.AttributeKey;
 

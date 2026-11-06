@@ -1,6 +1,6 @@
 package dev.j3rrryy.loommq.server.handler;
 
-import dev.j3rrryy.loommq.broker.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;

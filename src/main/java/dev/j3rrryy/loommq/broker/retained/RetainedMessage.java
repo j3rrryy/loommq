@@ -1,4 +1,4 @@
-package dev.j3rrryy.loommq.broker;
+package dev.j3rrryy.loommq.broker.retained;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCounted;
