@@ -1,13 +1,18 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import dev.j3rrryy.loommq.auth.AuthenticationHandler;
+import dev.j3rrryy.loommq.broker.session.Session;
+import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.util.ReferenceCountUtil;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 public final class Qos2Handler extends ChannelInboundHandlerAdapter {
 
     private final Set<Integer> incoming = ConcurrentHashMap.newKeySet();
@@ -22,19 +27,39 @@ public final class Qos2Handler extends ChannelInboundHandlerAdapter {
         }
 
         switch (mqttMsg.fixedHeader().messageType()) {
-            case PUBREL -> {
-                onPubRel(ctx, mqttMsg);
+            case PUBACK, PUBCOMP -> {
+                handleAck(ctx);
                 ReferenceCountUtil.release(msg);
             }
             case PUBREC -> {
                 onPubRec(ctx, mqttMsg);
                 ReferenceCountUtil.release(msg);
             }
-            case PUBCOMP -> {
-                onPubComp(mqttMsg);
+            case PUBREL -> {
+                onPubRel(ctx, mqttMsg);
                 ReferenceCountUtil.release(msg);
             }
             default -> ctx.fireChannelRead(msg);
+        }
+    }
+
+    private void handleAck(ChannelHandlerContext ctx) {
+        Session session = ctx.channel().attr(AuthenticationHandler.SESSION_KEY).get();
+        if (session != null) {
+            session.inFlightCount().decrementAndGet();
+            processPendingQueue(ctx, session);
+        }
+    }
+
+    private void processPendingQueue(ChannelHandlerContext ctx, Session session) {
+        boolean hadPending = !session.pendingMessages().isEmpty();
+        while (session.inFlightCount().get() < session.receiveMaximum() && !session.pendingMessages().isEmpty()) {
+            MqttPublishMessage pending = session.pendingMessages().poll();
+            session.inFlightCount().incrementAndGet();
+            ctx.writeAndFlush(pending);
+        }
+        if (hadPending && session.pendingMessages().isEmpty()) {
+            log.info("Backpressure resolved for client {}", NetworkUtils.remoteAddress(ctx.channel()));
         }
     }
 
@@ -61,11 +86,6 @@ public final class Qos2Handler extends ChannelInboundHandlerAdapter {
                 null
         );
         ctx.writeAndFlush(pubRel);
-    }
-
-    private void onPubComp(MqttMessage msg) {
-        int packetId = ((MqttMessageIdVariableHeader) msg.variableHeader()).messageId();
-        awaitingPubComp.remove(packetId);
     }
 
     public boolean isIncomingDuplicate(int packetId) {

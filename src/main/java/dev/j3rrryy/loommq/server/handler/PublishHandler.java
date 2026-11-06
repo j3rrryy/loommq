@@ -5,6 +5,7 @@ import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.routing.Delivery;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.topic.TopicValidator;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
@@ -113,8 +114,26 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         if (targetQos > 0 && packetId != -1) {
             builder.messageId(packetId);
         }
+        MqttPublishMessage pub = builder.build();
 
-        target.channel().writeAndFlush(builder.build());
+        if (targetQos > 0) {
+            Session session = target.channel().attr(AuthenticationHandler.SESSION_KEY).get();
+            if (session != null) {
+                if (session.inFlightCount().get() >= session.receiveMaximum()) {
+                    boolean isQueueEmpty = session.pendingMessages().isEmpty();
+                    session.pendingMessages().add(pub);
+                    if (isQueueEmpty) {
+                        log.warn("Backpressure started for client {}. In-flight: {}, Max: {}",
+                                NetworkUtils.remoteAddress(target.channel()),
+                                session.inFlightCount().get(),
+                                session.receiveMaximum());
+                    }
+                    return;
+                }
+                session.inFlightCount().incrementAndGet();
+            }
+        }
+        target.channel().writeAndFlush(pub);
     }
 
     private void sendError(ChannelHandlerContext ctx, int qos, int packetId, byte reasonCode) {

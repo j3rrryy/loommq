@@ -26,6 +26,13 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private final SessionRegistry sessionRegistry;
     private final SubscriptionRegistry subscriptionRegistry;
 
+    private static String getIp(ChannelHandlerContext ctx) {
+        if (ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress inet) {
+            return inet.getAddress().getHostAddress();
+        }
+        return "unknown";
+    }
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
         if (msg.fixedHeader().messageType() != MqttMessageType.CONNECT) {
@@ -33,7 +40,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             return;
         }
 
-        String ip = NetworkUtils.remoteAddress(ctx.channel());
+        String ip = getIp(ctx);
         if (!rateLimiter.isAllowed(ip)) {
             reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_BUSY);
             return;
@@ -75,21 +82,21 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         );
     }
 
-
     private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect, String clientId, boolean generatedClientId) {
         ctx.channel().attr(USER_KEY).set(user);
         boolean cleanStart = connect.variableHeader().isCleanSession();
         int sessionExpiry = getSessionExpiry(connect);
+        int receiveMaximum = getReceiveMaximum(connect);
 
         Session session;
         if (cleanStart) {
             sessionRegistry.remove(clientId);
-            session = new Session(clientId, sessionExpiry);
+            session = new Session(clientId, sessionExpiry, receiveMaximum);
             sessionRegistry.put(session);
         } else {
             session = sessionRegistry.get(clientId);
             if (session == null) {
-                session = new Session(clientId, sessionExpiry);
+                session = new Session(clientId, sessionExpiry, receiveMaximum);
                 sessionRegistry.put(session);
             } else {
                 for (var entry : session.subscriptions().entrySet()) {
@@ -133,6 +140,17 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             }
         }
         return 0;
+    }
+
+    private int getReceiveMaximum(MqttConnectMessage connect) {
+        MqttProperties properties = connect.variableHeader().properties();
+        if (properties != null) {
+            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty) properties.getProperty(MqttProperties.RECEIVE_MAXIMUM);
+            if (prop != null) {
+                return prop.value();
+            }
+        }
+        return 65535;
     }
 
     private void reject(ChannelHandlerContext ctx, MqttConnectReturnCode code) {
