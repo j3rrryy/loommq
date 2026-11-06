@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
@@ -36,6 +37,7 @@ public final class MqttServer {
     private final SessionRegistry sessionRegistry;
     private final MeterRegistry meterRegistry;
     private final AtomicInteger activeConnections;
+    private final AtomicBoolean isReady;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -82,6 +84,7 @@ public final class MqttServer {
                         meterRegistry, activeConnections));
 
         serverChannel = bootstrap.bind(config.host(), config.port()).sync().channel();
+        isReady.set(true);
         log.info("LoomMQ listening on {}:{}", config.host(), config.port());
     }
 
@@ -92,6 +95,7 @@ public final class MqttServer {
     }
 
     public void stop() {
+        isReady.set(false);
         log.info("Stopping LoomMQ");
         closeServerChannel();
         shutdownGroup(bossGroup);

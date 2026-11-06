@@ -11,19 +11,22 @@ import io.netty.handler.codec.http.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MetricsServer {
 
     private static final String METRICS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8";
 
     private final PrometheusMeterRegistry meterRegistry;
+    private final AtomicBoolean isReady;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Channel serverChannel;
 
-    public MetricsServer(PrometheusMeterRegistry meterRegistry) {
+    public MetricsServer(PrometheusMeterRegistry meterRegistry, AtomicBoolean isReady) {
         this.meterRegistry = meterRegistry;
+        this.isReady = isReady;
     }
 
     private static void shutdownGroup(EventLoopGroup group) {
@@ -64,10 +67,26 @@ public final class MetricsServer {
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
-            if (HttpMethod.GET.equals(request.method()) && "/metrics".equals(request.uri())) {
-                sendResponse(ctx, request, HttpResponseStatus.OK, meterRegistry.scrape(), METRICS_CONTENT_TYPE);
-            } else {
-                sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, "Not Found", HttpHeaderValues.TEXT_PLAIN.toString());
+            if (!HttpMethod.GET.equals(request.method())) {
+                sendResponse(ctx, request, HttpResponseStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", HttpHeaderValues.TEXT_PLAIN.toString());
+                return;
+            }
+
+            String uri = request.uri();
+            switch (uri) {
+                case "/metrics" ->
+                        sendResponse(ctx, request, HttpResponseStatus.OK, meterRegistry.scrape(), METRICS_CONTENT_TYPE);
+                case "/health/live" ->
+                        sendResponse(ctx, request, HttpResponseStatus.OK, "OK", HttpHeaderValues.TEXT_PLAIN.toString());
+                case "/health/ready" -> {
+                    if (isReady.get()) {
+                        sendResponse(ctx, request, HttpResponseStatus.OK, "OK", HttpHeaderValues.TEXT_PLAIN.toString());
+                    } else {
+                        sendResponse(ctx, request, HttpResponseStatus.SERVICE_UNAVAILABLE, "Not Ready", HttpHeaderValues.TEXT_PLAIN.toString());
+                    }
+                }
+                case null, default ->
+                        sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, "Not Found", HttpHeaderValues.TEXT_PLAIN.toString());
             }
         }
 

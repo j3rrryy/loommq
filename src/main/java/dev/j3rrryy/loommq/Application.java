@@ -38,6 +38,7 @@ public final class Application implements AutoCloseable {
         Config config = new ConfigLoader().load(configPath);
         PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         AtomicInteger activeConnections = new AtomicInteger(0);
+        AtomicBoolean isReady = new AtomicBoolean(false);
 
         this.jvmGcMetrics = new JvmGcMetrics();
         this.jvmGcMetrics.bindTo(meterRegistry);
@@ -56,8 +57,8 @@ public final class Application implements AutoCloseable {
         this.wal = new FileWal(config.walFile(), meterRegistry);
 
         this.server = new MqttServer(config, userStore, rateLimiter, registry, wal, sessionRegistry,
-                meterRegistry, activeConnections);
-        this.metricsServer = new MetricsServer(meterRegistry);
+                meterRegistry, activeConnections, isReady);
+        this.metricsServer = new MetricsServer(meterRegistry, isReady);
     }
 
     public int run() {
