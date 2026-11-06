@@ -6,6 +6,7 @@ import java.util.List;
 
 public record User(String username, String passwordHash, List<Permission> permissions) {
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean canPublish(String topic) {
         return hasPermission(Permission.Action.PUBLISH, topic);
     }

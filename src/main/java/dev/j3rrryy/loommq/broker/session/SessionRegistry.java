@@ -8,8 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class SessionRegistry {
 
     private final ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
+    private final MeterRegistry registry;
 
     public SessionRegistry(MeterRegistry registry) {
+        this.registry = registry;
         Gauge.builder("loommq.sessions.active", sessions, ConcurrentHashMap::size).register(registry);
     }
 
@@ -22,7 +24,18 @@ public final class SessionRegistry {
     }
 
     public void remove(String clientId) {
-        sessions.remove(clientId);
+        Session session = sessions.remove(clientId);
+        if (session != null) {
+            session.clearPending();
+            session.removeMetrics(registry);
+        }
+    }
+
+    public void remove(String clientId, Session session) {
+        if (sessions.remove(clientId, session)) {
+            session.clearPending();
+            session.removeMetrics(registry);
+        }
     }
 
 }

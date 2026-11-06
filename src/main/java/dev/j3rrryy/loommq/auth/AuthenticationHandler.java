@@ -4,6 +4,7 @@ import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.broker.session.WillMessage;
+import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -101,21 +102,21 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         int sessionExpiry = getSessionExpiry(connect);
         int receiveMaximum = getReceiveMaximum(connect);
 
-        Session session;
-        if (cleanStart) {
-            sessionRegistry.remove(clientId);
+        Session session = cleanStart ? null : sessionRegistry.get(clientId);
+        boolean sessionPresent = session != null;
+
+        if (sessionPresent) {
+            session.resetForReconnect(receiveMaximum);
+            for (var entry : session.subscriptions().entrySet()) {
+                subscriptionRegistry.subscribe(ctx.channel(), entry.getKey(), entry.getValue(),
+                        TopicFilterValidator.shareGroup(entry.getKey()));
+            }
+        } else {
+            if (cleanStart) {
+                sessionRegistry.remove(clientId);
+            }
             session = new Session(clientId, sessionExpiry, receiveMaximum, meterRegistry);
             sessionRegistry.put(session);
-        } else {
-            session = sessionRegistry.get(clientId);
-            if (session == null) {
-                session = new Session(clientId, sessionExpiry, receiveMaximum, meterRegistry);
-                sessionRegistry.put(session);
-            } else {
-                for (var entry : session.subscriptions().entrySet()) {
-                    subscriptionRegistry.subscribe(ctx.channel(), entry.getKey(), entry.getValue(), null);
-                }
-            }
         }
 
         ctx.channel().attr(SESSION_KEY).set(session);
@@ -137,7 +138,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         }
         MqttMessage connAck = MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
-                .sessionPresent(!cleanStart)
+                .sessionPresent(sessionPresent)
                 .properties(connAckProps)
                 .build();
         ctx.writeAndFlush(connAck);

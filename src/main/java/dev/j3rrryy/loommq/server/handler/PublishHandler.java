@@ -70,15 +70,6 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         boolean retain = msg.fixedHeader().isRetain();
         int packetId = msg.variableHeader().packetId();
 
-        if (qos == 2) {
-            if (qos2Handler.isIncomingDuplicate(packetId)) {
-                sendPubRec(ctx, packetId);
-                return;
-            }
-            qos2Handler.registerIncoming(packetId);
-            sendPubRec(ctx, packetId);
-        }
-
         if (!TopicValidator.isValid(topic)) {
             droppedInvalidTopicCounter.increment();
             log.warn("Invalid PUBLISH topic '{}' from {}", topic, NetworkUtils.remoteAddress(ctx.channel()));
@@ -92,6 +83,15 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                     user != null ? user.username() : "unknown", topic);
             sendError(ctx, qos, packetId, MqttReasonCodes.PubAck.NOT_AUTHORIZED.byteValue());
             return;
+        }
+
+        if (qos == 2) {
+            if (qos2Handler.isIncomingDuplicate(packetId)) {
+                sendPubRec(ctx, packetId);
+                return;
+            }
+            qos2Handler.registerIncoming(packetId);
+            sendPubRec(ctx, packetId);
         }
 
         byte[] payloadBytes = new byte[msg.payload().readableBytes()];
@@ -157,9 +157,13 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
             Session session = target.channel().attr(AuthenticationHandler.SESSION_KEY).get();
             if (session != null) {
                 if (session.inFlightCount().get() >= session.receiveMaximum()) {
+                    if (session.pendingMessages().size() >= Session.MAX_PENDING_MESSAGES) {
+                        pub.release();
+                        droppedBackpressureCounter.increment();
+                        return;
+                    }
                     boolean isQueueEmpty = session.pendingMessages().isEmpty();
                     session.pendingMessages().add(pub);
-                    droppedBackpressureCounter.increment();
                     if (isQueueEmpty) {
                         backpressureEventsCounter.increment();
                         log.warn("Backpressure started for client {}. In-flight: {}, Max: {}",
@@ -186,6 +190,12 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                     .reasonCode(reasonCode)
                     .build();
             ctx.writeAndFlush(pubAck);
+        } else if (qos == 2) {
+            MqttMessage pubRec = new MqttMessage(
+                    new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.AT_MOST_ONCE, false, 0),
+                    new MqttPubReplyMessageVariableHeader(packetId, reasonCode, MqttProperties.NO_PROPERTIES)
+            );
+            ctx.writeAndFlush(pubRec);
         }
     }
 

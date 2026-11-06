@@ -1,11 +1,14 @@
 package dev.j3rrryy.loommq.server.handler;
 
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
+import dev.j3rrryy.loommq.auth.User;
+import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.routing.Delivery;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.broker.session.WillMessage;
+import dev.j3rrryy.loommq.broker.topic.TopicValidator;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
@@ -32,6 +35,7 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
     private final SessionRegistry sessionRegistry;
     private final AtomicInteger activeConnections;
     private final Counter connectionsTotal;
+    private final AtomicInteger outboundPacketIdGenerator = new AtomicInteger(1);
 
     public MqttConnectionHandler(SubscriptionRegistry registry, Wal wal, SessionRegistry sessionRegistry,
                                  MeterRegistry meterRegistry, AtomicInteger activeConnections) {
@@ -55,12 +59,12 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
         log.debug("Client disconnected from {}", NetworkUtils.remoteAddress(ctx.channel()));
         WillMessage will = ctx.channel().attr(WillMessage.WILL_KEY).get();
         if (will != null) {
-            publishWill(will);
+            publishWill(ctx, will);
         }
 
         Session session = ctx.channel().attr(AuthenticationHandler.SESSION_KEY).get();
         if (session != null && session.sessionExpiryInterval() == 0) {
-            sessionRegistry.remove(session.clientId());
+            sessionRegistry.remove(session.clientId(), session);
         }
         registry.removeChannel(ctx.channel());
     }
@@ -97,21 +101,50 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
         ctx.close();
     }
 
-    private void publishWill(WillMessage will) {
+    private void publishWill(ChannelHandlerContext ctx, WillMessage will) {
+        User user = ctx.channel().attr(AuthenticationHandler.USER_KEY).get();
+        if (user == null || !TopicValidator.isValid(will.topic()) || !user.canPublish(will.topic())) {
+            log.warn("Rejected Will message for topic '{}'", will.topic());
+            return;
+        }
+
         log.info("Publishing Will message for topic '{}'", will.topic());
         WalMessage walMsg = new WalMessage(will.topic(), will.payload());
         wal.append(walMsg.toBytes());
 
+        if (will.retain()) {
+            if (will.payload().length == 0) {
+                registry.clearRetained(will.topic());
+            } else {
+                registry.storeRetained(will.topic(),
+                        new RetainedMessage(Unpooled.wrappedBuffer(will.payload()), will.qos(), 0));
+            }
+        }
+
         List<Delivery> targets = registry.findTargets(will.topic(), will.qos());
         for (Delivery target : targets) {
-            MqttMessage pub = MqttMessageBuilders.publish()
+            int targetQos = target.qos();
+            int packetId = targetQos > 0 ? nextPacketId() : -1;
+
+            MqttMessageBuilders.PublishBuilder builder = MqttMessageBuilders.publish()
                     .topicName(will.topic())
-                    .qos(MqttQoS.AT_MOST_ONCE)
-                    .retained(will.retain())
-                    .payload(Unpooled.wrappedBuffer(will.payload()))
-                    .build();
-            target.channel().writeAndFlush(pub);
+                    .qos(MqttQoS.valueOf(targetQos))
+                    .retained(false)
+                    .payload(Unpooled.wrappedBuffer(will.payload()));
+
+            if (targetQos > 0) {
+                builder.messageId(packetId);
+            }
+            target.channel().writeAndFlush(builder.build());
         }
+    }
+
+    private int nextPacketId() {
+        int id;
+        do {
+            id = Math.floorMod(outboundPacketIdGenerator.incrementAndGet(), 65535);
+        } while (id == 0);
+        return id;
     }
 
 }

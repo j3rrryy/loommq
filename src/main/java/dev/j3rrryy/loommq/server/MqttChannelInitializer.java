@@ -23,6 +23,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class MqttChannelInitializer extends ChannelInitializer<SocketChannel> {
 
     private static final int IDLE_TIMEOUT_SECONDS = 120;
+    private static final int MAX_BYTES_IN_MESSAGE = 16 * 1024 * 1024;
+    private static final int MAX_CLIENT_ID_LENGTH = 65535;
 
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
@@ -37,7 +39,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         Qos2Handler qos2Handler = new Qos2Handler();
         ChannelPipeline pipeline = ch.pipeline();
         pipeline.addLast("idleState", new IdleStateHandler(0, 0, IDLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
-        pipeline.addLast("mqttDecoder", new MqttDecoder());
+        pipeline.addLast("mqttDecoder", new MqttDecoder(MAX_BYTES_IN_MESSAGE, MAX_CLIENT_ID_LENGTH));
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
         pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter, sessionRegistry, registry, meterRegistry));
         pipeline.addLast("qos2Handler", qos2Handler);
