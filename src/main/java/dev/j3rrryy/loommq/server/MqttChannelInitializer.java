@@ -38,7 +38,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         pipeline.addLast("publishHandler", new PublishHandler(registry, qos2Handler, wal));
         pipeline.addLast("subscribeHandler", new SubscribeHandler(registry, wal));
         pipeline.addLast("unsubscribeHandler", new UnsubscribeHandler(registry));
-        pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry));
+        pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry, wal));
     }
 
 }

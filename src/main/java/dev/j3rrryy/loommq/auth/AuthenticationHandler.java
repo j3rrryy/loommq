@@ -1,5 +1,6 @@
 package dev.j3rrryy.loommq.auth;
 
+import dev.j3rrryy.loommq.broker.WillMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -8,7 +9,6 @@ import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -20,13 +20,6 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
 
-    private static String getIp(ChannelHandlerContext ctx) {
-        if (ctx.channel().remoteAddress() instanceof InetSocketAddress inet) {
-            return inet.getAddress().getHostAddress();
-        }
-        return "unknown";
-    }
-
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
         if (msg.fixedHeader().messageType() != MqttMessageType.CONNECT) {
@@ -34,7 +27,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             return;
         }
 
-        String ip = getIp(ctx);
+        String ip = NetworkUtils.remoteAddress(ctx.channel());
         if (!rateLimiter.isAllowed(ip)) {
             reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_BUSY);
             return;
@@ -53,7 +46,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         userStore.authenticate(username, password).ifPresentOrElse(
                 user -> {
                     rateLimiter.recordSuccess(ip);
-                    onAuthenticated(ctx, user);
+                    onAuthenticated(ctx, user, connect);
                 },
                 () -> {
                     rateLimiter.recordFailure(ip);
@@ -62,8 +55,17 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         );
     }
 
-    private void onAuthenticated(ChannelHandlerContext ctx, User user) {
+    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect) {
         ctx.channel().attr(USER_KEY).set(user);
+        if (connect.variableHeader().isWillFlag()) {
+            WillMessage will = new WillMessage(
+                    connect.payload().willTopic(),
+                    connect.payload().willMessageInBytes(),
+                    connect.variableHeader().willQos(),
+                    connect.variableHeader().isWillRetain()
+            );
+            ctx.channel().attr(WillMessage.WILL_KEY).set(will);
+        }
         log.info("Authenticated user={} from {}", user.username(), NetworkUtils.remoteAddress(ctx.channel()));
 
         MqttMessage connAck = MqttMessageBuilders.connAck()
@@ -71,7 +73,6 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
                 .sessionPresent(false)
                 .build();
         ctx.writeAndFlush(connAck);
-
         ctx.pipeline().remove(this);
     }
 
