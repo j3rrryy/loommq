@@ -4,6 +4,8 @@ import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.Channel;
 
 import java.util.*;
@@ -17,6 +19,10 @@ public final class SubscriptionRegistry {
     private final ConcurrentHashMap<Channel, Set<Subscription>> byChannel = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicInteger> sharedCursors = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RetainedMessage> retained = new ConcurrentHashMap<>();
+
+    public SubscriptionRegistry(MeterRegistry registry) {
+        Gauge.builder("loommq.messages.retained", retained, ConcurrentHashMap::size).register(registry);
+    }
 
     private static int effectiveQos(int publishQos, int subscriptionQos) {
         return Math.min(publishQos, subscriptionQos);

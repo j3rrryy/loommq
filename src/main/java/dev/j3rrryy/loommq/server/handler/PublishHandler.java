@@ -10,24 +10,57 @@ import dev.j3rrryy.loommq.broker.topic.TopicValidator;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
-@RequiredArgsConstructor
 public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublishMessage> {
 
     private final SubscriptionRegistry registry;
     private final Qos2Handler qos2Handler;
     private final Wal wal;
     private final AtomicInteger outboundPacketIdGenerator = new AtomicInteger(1);
+    private final Counter publishCounter;
+    private final Counter deliverCounter;
+    private final Counter bytesReceivedCounter;
+    private final Counter bytesSentCounter;
+    private final Counter droppedInvalidTopicCounter;
+    private final Counter droppedUnauthorizedCounter;
+    private final Counter droppedBackpressureCounter;
+    private final Counter backpressureEventsCounter;
+    private final Timer walAppendTimer;
+    private final Timer deliveryTimer;
+
+    public PublishHandler(SubscriptionRegistry registry, Qos2Handler qos2Handler, Wal wal, MeterRegistry meterRegistry) {
+        this.registry = registry;
+        this.qos2Handler = qos2Handler;
+        this.wal = wal;
+        this.publishCounter = Counter.builder("loommq.messages.publish").register(meterRegistry);
+        this.deliverCounter = Counter.builder("loommq.messages.deliver").register(meterRegistry);
+        this.bytesReceivedCounter = Counter.builder("loommq.bytes.received").register(meterRegistry);
+        this.bytesSentCounter = Counter.builder("loommq.bytes.sent").register(meterRegistry);
+        this.droppedInvalidTopicCounter = Counter.builder("loommq.messages.dropped")
+                .tag("reason", "invalid_topic")
+                .register(meterRegistry);
+        this.droppedUnauthorizedCounter = Counter.builder("loommq.messages.dropped")
+                .tag("reason", "unauthorized")
+                .register(meterRegistry);
+        this.droppedBackpressureCounter = Counter.builder("loommq.messages.dropped")
+                .tag("reason", "backpressure")
+                .register(meterRegistry);
+        this.backpressureEventsCounter = Counter.builder("loommq.backpressure.events").register(meterRegistry);
+        this.walAppendTimer = Timer.builder("loommq.latency.wal_append").register(meterRegistry);
+        this.deliveryTimer = Timer.builder("loommq.latency.delivery").register(meterRegistry);
+    }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttPublishMessage msg) {
@@ -47,12 +80,14 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         }
 
         if (!TopicValidator.isValid(topic)) {
+            droppedInvalidTopicCounter.increment();
             log.warn("Invalid PUBLISH topic '{}' from {}", topic, NetworkUtils.remoteAddress(ctx.channel()));
             sendError(ctx, qos, packetId, MqttReasonCodes.PubAck.TOPIC_NAME_INVALID.byteValue());
             return;
         }
 
         if (user == null || !user.canPublish(topic)) {
+            droppedUnauthorizedCounter.increment();
             log.warn("User '{}' not authorized to publish to '{}'",
                     user != null ? user.username() : "unknown", topic);
             sendError(ctx, qos, packetId, MqttReasonCodes.PubAck.NOT_AUTHORIZED.byteValue());
@@ -63,7 +98,9 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         msg.payload().getBytes(msg.payload().readerIndex(), payloadBytes);
 
         WalMessage walMessage = new WalMessage(topic, payloadBytes);
-        wal.append(walMessage.toBytes());
+        walAppendTimer.record(() -> wal.append(walMessage.toBytes()));
+        publishCounter.increment();
+        bytesReceivedCounter.increment(payloadBytes.length);
 
         if (retain) {
             if (msg.payload().readableBytes() == 0) {
@@ -122,7 +159,9 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                 if (session.inFlightCount().get() >= session.receiveMaximum()) {
                     boolean isQueueEmpty = session.pendingMessages().isEmpty();
                     session.pendingMessages().add(pub);
+                    droppedBackpressureCounter.increment();
                     if (isQueueEmpty) {
+                        backpressureEventsCounter.increment();
                         log.warn("Backpressure started for client {}. In-flight: {}, Max: {}",
                                 NetworkUtils.remoteAddress(target.channel()),
                                 session.inFlightCount().get(),
@@ -133,7 +172,11 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                 session.inFlightCount().incrementAndGet();
             }
         }
-        target.channel().writeAndFlush(pub);
+        deliveryTimer.record(() -> {
+            target.channel().writeAndFlush(pub);
+        });
+        deliverCounter.increment();
+        bytesSentCounter.increment(payload.readableBytes());
     }
 
     private void sendError(ChannelHandlerContext ctx, int qos, int packetId, byte reasonCode) {

@@ -9,18 +9,19 @@ import dev.j3rrryy.loommq.broker.session.WillMessage;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.handler.timeout.IdleStateEvent;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
-@RequiredArgsConstructor
 public final class MqttConnectionHandler extends SimpleChannelInboundHandler<MqttMessage> {
 
     private static final MqttMessage PINGRESP = new MqttMessage(
@@ -29,14 +30,28 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
     private final SubscriptionRegistry registry;
     private final Wal wal;
     private final SessionRegistry sessionRegistry;
+    private final AtomicInteger activeConnections;
+    private final Counter connectionsTotal;
+
+    public MqttConnectionHandler(SubscriptionRegistry registry, Wal wal, SessionRegistry sessionRegistry,
+                                 MeterRegistry meterRegistry, AtomicInteger activeConnections) {
+        this.registry = registry;
+        this.wal = wal;
+        this.sessionRegistry = sessionRegistry;
+        this.activeConnections = activeConnections;
+        this.connectionsTotal = Counter.builder("loommq.connections.total").register(meterRegistry);
+    }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
+        activeConnections.incrementAndGet();
+        connectionsTotal.increment();
         log.debug("Client connected from {}", NetworkUtils.remoteAddress(ctx.channel()));
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+        activeConnections.decrementAndGet();
         log.debug("Client disconnected from {}", NetworkUtils.remoteAddress(ctx.channel()));
         WillMessage will = ctx.channel().attr(WillMessage.WILL_KEY).get();
         if (will != null) {

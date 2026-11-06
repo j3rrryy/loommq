@@ -7,36 +7,58 @@ import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.config.ConfigLoader;
+import dev.j3rrryy.loommq.server.MetricsServer;
 import dev.j3rrryy.loommq.server.MqttServer;
 import dev.j3rrryy.loommq.wal.FileWal;
 import dev.j3rrryy.loommq.wal.Wal;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.binder.jvm.*;
+import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
+import io.micrometer.prometheusmetrics.PrometheusConfig;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public final class Application implements AutoCloseable {
 
+    private static final int METRICS_PORT = 8080;
+
+    private final PrometheusMeterRegistry meterRegistry;
+    private final AtomicInteger activeConnections = new AtomicInteger(0);
     private final MqttServer server;
     private final ConnectionRateLimiter rateLimiter;
     private final Wal wal;
+    private final MetricsServer metricsServer;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     public Application(Path configPath) {
         Config config = new ConfigLoader().load(configPath);
-        UserStore userStore = new YamlUserStore(config.usersFile());
+        this.meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+        new ClassLoaderMetrics().bindTo(meterRegistry);
+        new JvmMemoryMetrics().bindTo(meterRegistry);
+        new JvmGcMetrics().bindTo(meterRegistry);
+        new ProcessorMetrics().bindTo(meterRegistry);
+        new JvmThreadMetrics().bindTo(meterRegistry);
+        Gauge.builder("loommq.connections.active", activeConnections, AtomicInteger::get).register(meterRegistry);
+        UserStore userStore = new YamlUserStore(config.usersFile(), meterRegistry);
         this.rateLimiter = new ConnectionRateLimiter(config.rateLimit());
-        SubscriptionRegistry registry = new SubscriptionRegistry();
-        SessionRegistry sessionRegistry = new SessionRegistry();
-        this.wal = new FileWal(config.walFile());
-        this.server = new MqttServer(config, userStore, rateLimiter, registry, wal, sessionRegistry);
+        SubscriptionRegistry registry = new SubscriptionRegistry(meterRegistry);
+        SessionRegistry sessionRegistry = new SessionRegistry(meterRegistry);
+        this.wal = new FileWal(config.walFile(), meterRegistry);
+        this.server = new MqttServer(config, userStore, rateLimiter, registry, wal, sessionRegistry,
+                meterRegistry, activeConnections);
+        this.metricsServer = new MetricsServer(meterRegistry);
     }
 
     public int run() {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close, "loommq-shutdown"));
         try {
             log.info("Starting LoomMQ");
+            metricsServer.start(METRICS_PORT);
             server.start();
             server.awaitShutdown();
             return 0;
@@ -54,6 +76,7 @@ public final class Application implements AutoCloseable {
     public void close() {
         if (isClosed.compareAndSet(false, true)) {
             server.stop();
+            metricsServer.stop();
             rateLimiter.close();
             wal.close();
         }

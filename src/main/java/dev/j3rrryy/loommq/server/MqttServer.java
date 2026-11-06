@@ -6,6 +6,7 @@ import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.wal.Wal;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.epoll.Epoll;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -32,6 +34,8 @@ public final class MqttServer {
     private final SubscriptionRegistry registry;
     private final Wal wal;
     private final SessionRegistry sessionRegistry;
+    private final MeterRegistry meterRegistry;
+    private final AtomicInteger activeConnections;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
@@ -74,7 +78,8 @@ public final class MqttServer {
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childHandler(new MqttChannelInitializer(userStore, rateLimiter, registry, sessionRegistry, wal));
+                .childHandler(new MqttChannelInitializer(userStore, rateLimiter, registry, sessionRegistry, wal,
+                        meterRegistry, activeConnections));
 
         serverChannel = bootstrap.bind(config.host(), config.port()).sync().channel();
         log.info("LoomMQ listening on {}:{}", config.host(), config.port());

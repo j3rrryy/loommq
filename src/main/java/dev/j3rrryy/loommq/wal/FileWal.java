@@ -1,5 +1,8 @@
 package dev.j3rrryy.loommq.wal;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -18,12 +21,20 @@ public final class FileWal implements Wal {
     private static final int MAX_RECORD_SIZE = 10 * 1024 * 1024;
 
     private final FileChannel channel;
+    private final Counter appends;
+    private final Counter appendFailures;
     private final ReentrantLock writeLock = new ReentrantLock();
     private long nextOffset = 0;
     private long writePosition = 0;
 
-    public FileWal(Path path) {
+    public FileWal(Path path, MeterRegistry registry) {
+        this.appends = Counter.builder("loommq.wal.appends").register(registry);
+        this.appendFailures = Counter.builder("loommq.wal.append.failures").register(registry);
         try {
+            Path parent = path.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             boolean exists = Files.exists(path);
             this.channel = FileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.READ, StandardOpenOption.WRITE);
             if (exists) {
@@ -32,6 +43,15 @@ public final class FileWal implements Wal {
             log.info("WAL initialized at {}, next offset: {}", path, nextOffset);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to open WAL: " + path, e);
+        }
+        Gauge.builder("loommq.wal.size.bytes", channel, FileWal::channelSize).register(registry);
+    }
+
+    private static double channelSize(FileChannel channel) {
+        try {
+            return channel.size();
+        } catch (IOException e) {
+            return 0;
         }
     }
 
@@ -52,7 +72,9 @@ public final class FileWal implements Wal {
             }
             channel.force(false);
             nextOffset++;
+            appends.increment();
         } catch (IOException e) {
+            appendFailures.increment();
             throw new UncheckedIOException("Failed to append to WAL", e);
         } finally {
             writeLock.unlock();

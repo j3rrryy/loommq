@@ -5,17 +5,17 @@ import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.broker.session.WillMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
 import io.netty.util.AttributeKey;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
-@RequiredArgsConstructor
 public final class AuthenticationHandler extends SimpleChannelInboundHandler<MqttMessage> {
 
     public static final AttributeKey<User> USER_KEY = AttributeKey.valueOf("loommq.user");
@@ -25,6 +25,18 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private final ConnectionRateLimiter rateLimiter;
     private final SessionRegistry sessionRegistry;
     private final SubscriptionRegistry subscriptionRegistry;
+    private final MeterRegistry meterRegistry;
+    private final Counter rateLimitedCounter;
+
+    public AuthenticationHandler(UserStore userStore, ConnectionRateLimiter rateLimiter, SessionRegistry sessionRegistry,
+                                 SubscriptionRegistry subscriptionRegistry, MeterRegistry meterRegistry) {
+        this.userStore = userStore;
+        this.rateLimiter = rateLimiter;
+        this.sessionRegistry = sessionRegistry;
+        this.subscriptionRegistry = subscriptionRegistry;
+        this.meterRegistry = meterRegistry;
+        this.rateLimitedCounter = Counter.builder("loommq.auth.rate_limited").register(meterRegistry);
+    }
 
     private static String getIp(ChannelHandlerContext ctx) {
         if (ctx.channel().remoteAddress() instanceof java.net.InetSocketAddress inet) {
@@ -42,6 +54,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
 
         String ip = getIp(ctx);
         if (!rateLimiter.isAllowed(ip)) {
+            rateLimitedCounter.increment();
             reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_SERVER_BUSY);
             return;
         }
@@ -91,12 +104,12 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         Session session;
         if (cleanStart) {
             sessionRegistry.remove(clientId);
-            session = new Session(clientId, sessionExpiry, receiveMaximum);
+            session = new Session(clientId, sessionExpiry, receiveMaximum, meterRegistry);
             sessionRegistry.put(session);
         } else {
             session = sessionRegistry.get(clientId);
             if (session == null) {
-                session = new Session(clientId, sessionExpiry, receiveMaximum);
+                session = new Session(clientId, sessionExpiry, receiveMaximum, meterRegistry);
                 sessionRegistry.put(session);
             } else {
                 for (var entry : session.subscriptions().entrySet()) {

@@ -1,5 +1,7 @@
 package dev.j3rrryy.loommq.broker.session;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 import java.util.Queue;
@@ -17,10 +19,13 @@ public final class Session {
     private final AtomicInteger inFlightCount = new AtomicInteger(0);
     private final Queue<MqttPublishMessage> pendingMessages = new ConcurrentLinkedQueue<>();
 
-    public Session(String clientId, int sessionExpiryInterval, int receiveMaximum) {
+    public Session(String clientId, int sessionExpiryInterval, int receiveMaximum, MeterRegistry registry) {
         this.clientId = clientId;
         this.sessionExpiryInterval = sessionExpiryInterval;
         this.receiveMaximum = receiveMaximum == 0 ? 65535 : receiveMaximum;
+        Gauge.builder("loommq.queue.size", pendingMessages, Queue::size)
+                .tag("client", clientId)
+                .register(registry);
     }
 
     public String clientId() {

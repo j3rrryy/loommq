@@ -4,6 +4,7 @@ import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.routing.Delivery;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -22,7 +23,7 @@ class SubscriptionRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new SubscriptionRegistry();
+        registry = new SubscriptionRegistry(new SimpleMeterRegistry());
     }
 
     @Test

@@ -19,6 +19,7 @@ repositories {
 dependencies {
     implementation("io.netty:netty-handler:4.2.20.Final")
     implementation("io.netty:netty-codec-mqtt:4.2.20.Final")
+    implementation("io.netty:netty-codec-http:4.2.20.Final")
     implementation("io.netty:netty-transport-classes-epoll:4.2.20.Final")
     implementation("io.netty:netty-transport-classes-kqueue:4.2.20.Final")
     runtimeOnly("io.netty:netty-transport-native-epoll:4.2.20.Final:linux-x86_64")
@@ -30,6 +31,8 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.20")
     runtimeOnly("ch.qos.logback:logback-classic:1.6.6")
     implementation("info.picocli:picocli:4.7.7")
+    implementation("io.micrometer:micrometer-core:1.17.2")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.17.2")
     compileOnly("org.projectlombok:lombok:1.18.48")
     annotationProcessor("org.projectlombok:lombok:1.18.48")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))

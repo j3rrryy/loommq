@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.password4j.Argon2Function;
 import com.password4j.Password;
 import com.password4j.types.Argon2;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 
@@ -33,9 +35,11 @@ public final class YamlUserStore implements UserStore {
     private static final YAMLMapper YAML = YAMLMapper.builder().build();
 
     private final Map<String, User> users;
+    private final Counter authFailures;
 
-    public YamlUserStore(Path path) {
+    public YamlUserStore(Path path, MeterRegistry registry) {
         this.users = load(path);
+        this.authFailures = Counter.builder("loommq.auth.failures").register(registry);
         log.info("Loaded {} user(s) from {}", users.size(), path);
     }
 
@@ -96,12 +100,15 @@ public final class YamlUserStore implements UserStore {
         }
         User user = users.get(username);
         if (user == null) {
+            authFailures.increment();
             return Optional.empty();
         }
         Argon2Function function = Argon2Function.getInstanceFromHash(user.passwordHash());
-        return Password.check(password, user.passwordHash()).with(function)
-                ? Optional.of(user)
-                : Optional.empty();
+        if (Password.check(password, user.passwordHash()).with(function)) {
+            return Optional.of(user);
+        }
+        authFailures.increment();
+        return Optional.empty();
     }
 
     private record UsersFile(@JsonProperty("users") List<UserEntry> users) {
