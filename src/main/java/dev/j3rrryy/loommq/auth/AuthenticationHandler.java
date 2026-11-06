@@ -46,19 +46,27 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         }
 
         String clientId = connect.payload().clientIdentifier();
+        boolean generatedClientId = false;
+
         if (clientId == null || clientId.isBlank()) {
-            reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_CLIENT_IDENTIFIER_NOT_VALID);
-            return;
+            if (!connect.variableHeader().isCleanSession()) {
+                reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_CLIENT_IDENTIFIER_NOT_VALID);
+                return;
+            }
+            clientId = "auto-" + java.util.UUID.randomUUID();
+            generatedClientId = true;
         }
 
         String username = connect.payload().userName();
         byte[] passwordBytes = connect.payload().passwordInBytes();
         String password = passwordBytes == null ? null : new String(passwordBytes, StandardCharsets.UTF_8);
+        final String finalClientId = clientId;
+        final boolean isGenerated = generatedClientId;
 
         userStore.authenticate(username, password).ifPresentOrElse(
                 user -> {
                     rateLimiter.recordSuccess(ip);
-                    onAuthenticated(ctx, user, connect, clientId);
+                    onAuthenticated(ctx, user, connect, finalClientId, isGenerated);
                 },
                 () -> {
                     rateLimiter.recordFailure(ip);
@@ -68,7 +76,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     }
 
 
-    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect, String clientId) {
+    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect, String clientId, boolean generatedClientId) {
         ctx.channel().attr(USER_KEY).set(user);
         boolean cleanStart = connect.variableHeader().isCleanSession();
         int sessionExpiry = getSessionExpiry(connect);
@@ -100,12 +108,17 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             );
             ctx.channel().attr(WillMessage.WILL_KEY).set(will);
         }
-
         log.info("Authenticated user={} clientId={} from {}", user.username(), clientId, NetworkUtils.remoteAddress(ctx.channel()));
 
+        MqttProperties connAckProps = MqttProperties.NO_PROPERTIES;
+        if (generatedClientId) {
+            connAckProps = new MqttProperties();
+            connAckProps.add(new MqttProperties.StringProperty(MqttProperties.ASSIGNED_CLIENT_IDENTIFIER, clientId));
+        }
         MqttMessage connAck = MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
                 .sessionPresent(!cleanStart)
+                .properties(connAckProps)
                 .build();
         ctx.writeAndFlush(connAck);
         ctx.pipeline().remove(this);
