@@ -29,7 +29,7 @@ public final class Application implements AutoCloseable {
         this.rateLimiter = new ConnectionRateLimiter(config.rateLimit());
         SubscriptionRegistry registry = new SubscriptionRegistry();
         SessionRegistry sessionRegistry = new SessionRegistry();
-        this.wal = new FileWal(Path.of("wal.log"));
+        this.wal = new FileWal(config.walFile());
         this.server = new MqttServer(config, userStore, rateLimiter, registry, wal, sessionRegistry);
     }
 

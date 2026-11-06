@@ -6,6 +6,7 @@ public record Config(
         String host,
         int port,
         Path usersFile,
+        Path walFile,
         RateLimitConfig rateLimit
 ) {
 
@@ -14,6 +15,7 @@ public record Config(
                 "0.0.0.0",
                 1883,
                 Path.of("users.yaml"),
+                Path.of("data/wal.log"),
                 new RateLimitConfig(5, 60, 300)
         );
     }

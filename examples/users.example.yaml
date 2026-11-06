@@ -1,0 +1,8 @@
+users:
+  - username: billing
+    password: "change-me-billing"
+    permissions:
+      - action: publish
+        topic: "orders/created"
+      - action: subscribe
+        topic: "billing/#"

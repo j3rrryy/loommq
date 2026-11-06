@@ -5,7 +5,6 @@ import com.password4j.Argon2Function;
 import com.password4j.Password;
 import com.password4j.types.Argon2;
 import lombok.extern.slf4j.Slf4j;
-import tools.jackson.core.JacksonException;
 import tools.jackson.dataformat.yaml.YAMLMapper;
 
 import java.nio.file.Files;
@@ -41,10 +40,13 @@ public final class YamlUserStore implements UserStore {
     }
 
     private static Map<String, User> load(Path path) {
-        if (!Files.exists(path)) {
+        if (!Files.isRegularFile(path)) {
             return bootstrapAdmin();
         }
         try {
+            if (Files.size(path) == 0) {
+                return bootstrapAdmin();
+            }
             UsersFile file = YAML.readValue(path.toFile(), UsersFile.class);
             if (file.users() == null || file.users().isEmpty()) {
                 return bootstrapAdmin();
@@ -52,7 +54,7 @@ public final class YamlUserStore implements UserStore {
             return file.users().stream()
                     .map(YamlUserStore::toUser)
                     .collect(Collectors.toUnmodifiableMap(User::username, u -> u));
-        } catch (JacksonException e) {
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to load users from " + path, e);
         }
     }

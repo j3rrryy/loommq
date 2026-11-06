@@ -1,0 +1,17 @@
+volumes:
+  data:
+
+services:
+  loommq:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "8080:8080"
+    environment:
+      - LOOMMQ_BOOTSTRAP_ADMIN_PASSWORD=admin
+    volumes:
+      - ./users.yaml:/app/users.yaml:ro
+      - ./config.yaml:/app/config.yaml:ro
+      - data:/app/data
+    container_name: loommq
