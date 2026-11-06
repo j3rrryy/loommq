@@ -1,6 +1,8 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.Session;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.*;
@@ -21,6 +23,10 @@ public final class UnsubscribeHandler extends SimpleChannelInboundHandler<MqttUn
 
         for (String topicFilter : msg.payload().topics()) {
             registry.unsubscribe(ctx.channel(), topicFilter);
+            Session session = ctx.channel().attr(AuthenticationHandler.SESSION_KEY).get();
+            if (session != null) {
+                session.removeSubscription(topicFilter);
+            }
             reasonCodes.add((short) MqttReasonCodes.UnsubAck.SUCCESS.byteValue());
         }
 

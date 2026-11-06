@@ -1,7 +1,10 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.broker.routing.Delivery;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.Session;
+import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.broker.session.WillMessage;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
@@ -25,6 +28,7 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
 
     private final SubscriptionRegistry registry;
     private final Wal wal;
+    private final SessionRegistry sessionRegistry;
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
@@ -37,6 +41,11 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
         WillMessage will = ctx.channel().attr(WillMessage.WILL_KEY).get();
         if (will != null) {
             publishWill(will);
+        }
+
+        Session session = ctx.channel().attr(AuthenticationHandler.SESSION_KEY).get();
+        if (session != null && session.sessionExpiryInterval() == 0) {
+            sessionRegistry.remove(session.clientId());
         }
         registry.removeChannel(ctx.channel());
     }

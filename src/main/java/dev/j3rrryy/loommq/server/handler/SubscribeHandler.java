@@ -4,6 +4,7 @@ import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
 import dev.j3rrryy.loommq.broker.wal.WalMessage;
@@ -60,10 +61,14 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
             registry.subscribe(ctx.channel(), requested, qos, shareGroup);
             reasonCodes.add(qos);
             grantedFilters.add(shareGroup == null ? actual : null);
+
+            Session session = ctx.channel().attr(AuthenticationHandler.SESSION_KEY).get();
+            if (session != null) {
+                session.addSubscription(requested, qos);
+            }
         }
 
         ctx.writeAndFlush(buildSubAck(packetId, reasonCodes));
-
         for (int i = 0; i < grantedFilters.size(); i++) {
             if (grantedFilters.get(i) != null && reasonCodes.get(i) < 0x80) {
                 if (replayOffset >= 0) {

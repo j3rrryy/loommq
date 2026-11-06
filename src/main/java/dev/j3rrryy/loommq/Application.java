@@ -4,6 +4,7 @@ import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.auth.YamlUserStore;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.config.Config;
 import dev.j3rrryy.loommq.config.ConfigLoader;
 import dev.j3rrryy.loommq.server.MqttServer;
@@ -27,8 +28,9 @@ public final class Application implements AutoCloseable {
         UserStore userStore = new YamlUserStore(config.usersFile());
         this.rateLimiter = new ConnectionRateLimiter(config.rateLimit());
         SubscriptionRegistry registry = new SubscriptionRegistry();
+        SessionRegistry sessionRegistry = new SessionRegistry();
         this.wal = new FileWal(Path.of("wal.log"));
-        this.server = new MqttServer(config, userStore, rateLimiter, registry, wal);
+        this.server = new MqttServer(config, userStore, rateLimiter, registry, wal, sessionRegistry);
     }
 
     public int run() {

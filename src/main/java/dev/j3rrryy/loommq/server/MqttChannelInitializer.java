@@ -4,6 +4,7 @@ import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.server.handler.*;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.channel.ChannelInitializer;
@@ -24,6 +25,7 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
     private final SubscriptionRegistry registry;
+    private final SessionRegistry sessionRegistry;
     private final Wal wal;
 
     @Override
@@ -33,12 +35,12 @@ public final class MqttChannelInitializer extends ChannelInitializer<SocketChann
         pipeline.addLast("idleState", new IdleStateHandler(0, 0, IDLE_TIMEOUT_SECONDS, TimeUnit.SECONDS));
         pipeline.addLast("mqttDecoder", new MqttDecoder());
         pipeline.addLast("mqttEncoder", MqttEncoder.INSTANCE);
-        pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter));
+        pipeline.addLast("authentication", new AuthenticationHandler(userStore, rateLimiter, sessionRegistry, registry));
         pipeline.addLast("qos2Handler", qos2Handler);
         pipeline.addLast("publishHandler", new PublishHandler(registry, qos2Handler, wal));
         pipeline.addLast("subscribeHandler", new SubscribeHandler(registry, wal));
         pipeline.addLast("unsubscribeHandler", new UnsubscribeHandler(registry));
-        pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry, wal));
+        pipeline.addLast("mqttHandler", new MqttConnectionHandler(registry, wal, sessionRegistry));
     }
 
 }

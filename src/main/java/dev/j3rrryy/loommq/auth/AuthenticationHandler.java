@@ -1,5 +1,8 @@
 package dev.j3rrryy.loommq.auth;
 
+import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
+import dev.j3rrryy.loommq.broker.session.Session;
+import dev.j3rrryy.loommq.broker.session.SessionRegistry;
 import dev.j3rrryy.loommq.broker.session.WillMessage;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,9 +19,12 @@ import java.nio.charset.StandardCharsets;
 public final class AuthenticationHandler extends SimpleChannelInboundHandler<MqttMessage> {
 
     public static final AttributeKey<User> USER_KEY = AttributeKey.valueOf("loommq.user");
+    public static final AttributeKey<Session> SESSION_KEY = AttributeKey.valueOf("loommq.session");
 
     private final UserStore userStore;
     private final ConnectionRateLimiter rateLimiter;
+    private final SessionRegistry sessionRegistry;
+    private final SubscriptionRegistry subscriptionRegistry;
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, MqttMessage msg) {
@@ -39,6 +45,12 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             return;
         }
 
+        String clientId = connect.payload().clientIdentifier();
+        if (clientId == null || clientId.isBlank()) {
+            reject(ctx, MqttConnectReturnCode.CONNECTION_REFUSED_CLIENT_IDENTIFIER_NOT_VALID);
+            return;
+        }
+
         String username = connect.payload().userName();
         byte[] passwordBytes = connect.payload().passwordInBytes();
         String password = passwordBytes == null ? null : new String(passwordBytes, StandardCharsets.UTF_8);
@@ -46,7 +58,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         userStore.authenticate(username, password).ifPresentOrElse(
                 user -> {
                     rateLimiter.recordSuccess(ip);
-                    onAuthenticated(ctx, user, connect);
+                    onAuthenticated(ctx, user, connect, clientId);
                 },
                 () -> {
                     rateLimiter.recordFailure(ip);
@@ -55,8 +67,30 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         );
     }
 
-    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect) {
+
+    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect, String clientId) {
         ctx.channel().attr(USER_KEY).set(user);
+        boolean cleanStart = connect.variableHeader().isCleanSession();
+        int sessionExpiry = getSessionExpiry(connect);
+
+        Session session;
+        if (cleanStart) {
+            sessionRegistry.remove(clientId);
+            session = new Session(clientId, sessionExpiry);
+            sessionRegistry.put(session);
+        } else {
+            session = sessionRegistry.get(clientId);
+            if (session == null) {
+                session = new Session(clientId, sessionExpiry);
+                sessionRegistry.put(session);
+            } else {
+                for (var entry : session.subscriptions().entrySet()) {
+                    subscriptionRegistry.subscribe(ctx.channel(), entry.getKey(), entry.getValue(), null);
+                }
+            }
+        }
+
+        ctx.channel().attr(SESSION_KEY).set(session);
         if (connect.variableHeader().isWillFlag()) {
             WillMessage will = new WillMessage(
                     connect.payload().willTopic(),
@@ -66,14 +100,26 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             );
             ctx.channel().attr(WillMessage.WILL_KEY).set(will);
         }
-        log.info("Authenticated user={} from {}", user.username(), NetworkUtils.remoteAddress(ctx.channel()));
+
+        log.info("Authenticated user={} clientId={} from {}", user.username(), clientId, NetworkUtils.remoteAddress(ctx.channel()));
 
         MqttMessage connAck = MqttMessageBuilders.connAck()
                 .returnCode(MqttConnectReturnCode.CONNECTION_ACCEPTED)
-                .sessionPresent(false)
+                .sessionPresent(!cleanStart)
                 .build();
         ctx.writeAndFlush(connAck);
         ctx.pipeline().remove(this);
+    }
+
+    private int getSessionExpiry(MqttConnectMessage connect) {
+        MqttProperties properties = connect.variableHeader().properties();
+        if (properties != null) {
+            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty) properties.getProperty(MqttProperties.SESSION_EXPIRY_INTERVAL);
+            if (prop != null) {
+                return prop.value();
+            }
+        }
+        return 0;
     }
 
     private void reject(ChannelHandlerContext ctx, MqttConnectReturnCode code) {
