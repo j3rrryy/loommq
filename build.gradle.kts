@@ -47,7 +47,12 @@ dependencies {
 
 application {
     mainClass = "dev.j3rrryy.loommq.Main"
-    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
+    applicationDefaultJvmArgs = listOf(
+        "--enable-native-access=ALL-UNNAMED",
+        "-XX:+UseZGC",
+        "-XX:MaxRAMPercentage=75.0",
+        "-XX:+ExitOnOutOfMemoryError"
+    )
 }
 
 jacoco {

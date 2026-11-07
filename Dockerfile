@@ -1,5 +1,7 @@
 FROM eclipse-temurin:25-jdk-alpine AS builder
 
+ENV JAVA_TOOL_OPTIONS="--enable-native-access=ALL-UNNAMED"
+
 WORKDIR /app
 COPY gradle gradle
 COPY gradlew .
@@ -21,6 +23,7 @@ RUN mkdir -p /app/data && chown -R loommq:loommq /app
 USER loommq
 
 EXPOSE 1883
+EXPOSE 8080
 
 ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 

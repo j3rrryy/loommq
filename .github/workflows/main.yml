@@ -1,4 +1,4 @@
-name: Build, Lint, Test, Lint Chart
+name: Build, Lint, Test
 
 on:
   push:
