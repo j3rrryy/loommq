@@ -49,7 +49,7 @@ public final class UnsubscribeHandler extends SimpleChannelInboundHandler<MqttUn
                 new MqttUnsubAckPayload(codes)
         );
 
-        ctx.writeAndFlush(unsubAck);
+        var _ = ctx.writeAndFlush(unsubAck);
     }
 
 }

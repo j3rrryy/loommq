@@ -108,7 +108,7 @@ public final class MqttServer {
 
     private void closeServerChannel() {
         if (serverChannel != null) {
-            serverChannel.close().syncUninterruptibly();
+            var _ = serverChannel.close().syncUninterruptibly();
             serverChannel = null;
         }
     }

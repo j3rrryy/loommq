@@ -69,7 +69,7 @@ public final class MetricsServer {
 
     public void stop() {
         if (serverChannel != null) {
-            serverChannel.close().syncUninterruptibly();
+            var _ = serverChannel.close().syncUninterruptibly();
             serverChannel = null;
         }
         shutdownGroup(bossGroup);
@@ -116,16 +116,16 @@ public final class MetricsServer {
             HttpUtil.setContentLength(response, response.content().readableBytes());
             boolean keepAlive = HttpUtil.isKeepAlive(request);
             HttpUtil.setKeepAlive(response, keepAlive);
-            ctx.writeAndFlush(response).addListener(_ -> {
+            var _ = ctx.writeAndFlush(response).addListener(_ -> {
                 if (!keepAlive) {
-                    ctx.close();
+                    var _ = ctx.close();
                 }
             });
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            ctx.close();
+            var _ = ctx.close();
         }
 
     }

@@ -79,7 +79,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
             }
         }
 
-        ctx.writeAndFlush(buildSubAck(packetId, reasonCodes));
+        var _ = ctx.writeAndFlush(buildSubAck(packetId, reasonCodes));
         for (int i = 0; i < grantedFilters.size(); i++) {
             if (grantedFilters.get(i) != null && reasonCodes.get(i) < 0x80) {
                 if (replayOffset >= 0) {
@@ -100,7 +100,8 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
                 if ("replay-from-offset".equals(pair.key)) {
                     try {
                         return Long.parseLong(pair.value);
-                    } catch (NumberFormatException ignored) {
+                    } catch (NumberFormatException e) {
+                        log.debug("Failed to parse offset", e);
                     }
                 }
             }
@@ -132,9 +133,9 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
                         MqttMessage pub = MqttMessageBuilders.publish()
                                 .topicName(wm.topic())
                                 .qos(MqttQoS.AT_MOST_ONCE)
-                                .payload(io.netty.buffer.Unpooled.wrappedBuffer(wm.payload()))
+                                .payload(wm.payload())
                                 .build();
-                        ctx.writeAndFlush(pub);
+                        var _ = ctx.writeAndFlush(pub);
                     }
                 }
                 currentOffset++;
@@ -157,7 +158,7 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
                 builder.messageId(nextPacketId());
             }
 
-            ctx.write(builder.build());
+            var _ = ctx.write(builder.build());
             delivery.message().release();
         }
         if (!retained.isEmpty()) {

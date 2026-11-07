@@ -17,6 +17,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
@@ -108,7 +109,7 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
         byte[] payloadBytes = new byte[msg.payload().readableBytes()];
         msg.payload().getBytes(msg.payload().readerIndex(), payloadBytes);
 
-        WalMessage walMessage = new WalMessage(topic, payloadBytes);
+        WalMessage walMessage = new WalMessage(topic, Unpooled.wrappedBuffer(payloadBytes));
         walAppendTimer.record(() -> wal.append(walMessage.toBytes()));
         publishCounter.increment();
         bytesReceivedCounter.increment(payloadBytes.length);
@@ -138,7 +139,7 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                     .packetId(packetId)
                     .reasonCode(MqttReasonCodes.PubAck.SUCCESS.byteValue())
                     .build();
-            ctx.writeAndFlush(pubAck);
+            var _ = ctx.writeAndFlush(pubAck);
         }
     }
 
@@ -148,7 +149,7 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                 MqttMessageIdVariableHeader.from(packetId),
                 null
         );
-        ctx.writeAndFlush(pubRec);
+        var _ = ctx.writeAndFlush(pubRec);
     }
 
     private void sendToSubscriber(Delivery target, String topic, ByteBuf payload, boolean retain, int packetId) {
@@ -188,7 +189,7 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
             }
         }
         deliveryTimer.record(() -> {
-            target.channel().writeAndFlush(pub);
+            var _ = target.channel().writeAndFlush(pub);
         });
         deliverCounter.increment();
         bytesSentCounter.increment(payload.readableBytes());
@@ -200,13 +201,13 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
                     .packetId(packetId)
                     .reasonCode(reasonCode)
                     .build();
-            ctx.writeAndFlush(pubAck);
+            var _ = ctx.writeAndFlush(pubAck);
         } else if (qos == 2) {
             MqttMessage pubRec = new MqttMessage(
                     new MqttFixedHeader(MqttMessageType.PUBREC, false, MqttQoS.AT_MOST_ONCE, false, 0),
                     new MqttPubReplyMessageVariableHeader(packetId, reasonCode, MqttProperties.NO_PROPERTIES)
             );
-            ctx.writeAndFlush(pubRec);
+            var _ = ctx.writeAndFlush(pubRec);
         }
     }
 

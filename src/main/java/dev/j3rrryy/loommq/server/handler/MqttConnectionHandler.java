@@ -17,7 +17,6 @@ import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.MqttFixedHeader;
@@ -79,10 +78,12 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
             return;
         }
         switch (msg.fixedHeader().messageType()) {
-            case PINGREQ -> ctx.writeAndFlush(PINGRESP);
+            case PINGREQ -> {
+                var _ = ctx.writeAndFlush(PINGRESP);
+            }
             case DISCONNECT -> {
                 ctx.channel().attr(WillMessage.WILL_KEY).set(null);
-                ctx.close();
+                var _ = ctx.close();
             }
             case PUBLISH, SUBSCRIBE, UNSUBSCRIBE -> {
             }
@@ -95,14 +96,14 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
             log.debug("Client idle timeout: {}", NetworkUtils.remoteAddress(ctx.channel()));
-            ctx.close();
+            var _ = ctx.close();
         }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         log.warn("Exception on channel {}", NetworkUtils.remoteAddress(ctx.channel()), cause);
-        ctx.close();
+        var _ = ctx.close();
     }
 
     private void publishWill(ChannelHandlerContext ctx, WillMessage will) {
@@ -117,11 +118,11 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
         wal.append(walMsg.toBytes());
 
         if (will.retain()) {
-            if (will.payload().length == 0) {
+            if (will.payload().readableBytes() == 0) {
                 registry.clearRetained(will.topic());
             } else {
                 registry.storeRetained(will.topic(),
-                        new RetainedMessage(Unpooled.wrappedBuffer(will.payload()), will.qos(), 0));
+                        new RetainedMessage(will.payload().retainedDuplicate(), will.qos(), 0));
             }
         }
 
@@ -134,12 +135,12 @@ public final class MqttConnectionHandler extends SimpleChannelInboundHandler<Mqt
                     .topicName(will.topic())
                     .qos(MqttQoS.valueOf(targetQos))
                     .retained(false)
-                    .payload(Unpooled.wrappedBuffer(will.payload()));
+                    .payload(will.payload());
 
             if (targetQos > 0) {
                 builder.messageId(packetId);
             }
-            target.channel().writeAndFlush(builder.build());
+            var _ = target.channel().writeAndFlush(builder.build());
         }
     }
 

@@ -62,7 +62,7 @@ public final class Qos2Handler extends ChannelInboundHandlerAdapter {
         while (session.inFlightCount().get() < session.receiveMaximum() && !session.pendingMessages().isEmpty()) {
             MqttPublishMessage pending = session.pendingMessages().poll();
             session.inFlightCount().incrementAndGet();
-            ctx.writeAndFlush(pending);
+            var _ = ctx.writeAndFlush(pending);
         }
         if (hadPending && session.pendingMessages().isEmpty()) {
             log.info("Backpressure resolved for client {}", NetworkUtils.remoteAddress(ctx.channel()));
@@ -78,7 +78,7 @@ public final class Qos2Handler extends ChannelInboundHandlerAdapter {
                 MqttMessageIdVariableHeader.from(packetId),
                 null
         );
-        ctx.writeAndFlush(pubComp);
+        var _ = ctx.writeAndFlush(pubComp);
     }
 
     private void onPubRec(ChannelHandlerContext ctx, MqttMessage msg) {
@@ -91,7 +91,7 @@ public final class Qos2Handler extends ChannelInboundHandlerAdapter {
                 MqttMessageIdVariableHeader.from(packetId),
                 null
         );
-        ctx.writeAndFlush(pubRel);
+        var _ = ctx.writeAndFlush(pubRel);
     }
 
     public boolean isIncomingDuplicate(int packetId) {

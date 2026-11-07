@@ -10,6 +10,7 @@ import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import dev.j3rrryy.loommq.server.NetworkUtils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.mqtt.MqttConnectMessage;
@@ -131,7 +132,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         if (connect.variableHeader().isWillFlag()) {
             WillMessage will = new WillMessage(
                     connect.payload().willTopic(),
-                    connect.payload().willMessageInBytes(),
+                    Unpooled.wrappedBuffer(connect.payload().willMessageInBytes()),
                     connect.variableHeader().willQos(),
                     connect.variableHeader().isWillRetain()
             );
@@ -150,7 +151,7 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
                 .sessionPresent(sessionPresent)
                 .properties(connAckProps)
                 .build();
-        ctx.writeAndFlush(connAck);
+        var _ = ctx.writeAndFlush(connAck);
         ctx.pipeline().remove(this);
     }
 
@@ -184,7 +185,9 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
                 .returnCode(code)
                 .sessionPresent(false)
                 .build();
-        ctx.writeAndFlush(connAck).addListener(_ -> ctx.close());
+        var _ = ctx.writeAndFlush(connAck).addListener(_ -> {
+            var _ = ctx.close();
+        });
     }
 
 }
