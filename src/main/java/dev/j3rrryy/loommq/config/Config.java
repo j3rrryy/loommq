@@ -5,6 +5,7 @@ import java.nio.file.Path;
 public record Config(
         String host,
         int port,
+        int metricsPort,
         Path usersFile,
         Path walFile,
         RateLimitConfig rateLimit
@@ -14,6 +15,7 @@ public record Config(
         return new Config(
                 "0.0.0.0",
                 1883,
+                8080,
                 Path.of("users.yaml"),
                 Path.of("data/wal.log"),
                 new RateLimitConfig(5, 60, 300)

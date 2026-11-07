@@ -28,17 +28,16 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public final class Application implements AutoCloseable {
 
-    private static final int METRICS_PORT = 8080;
-
     private final MqttServer server;
     private final ConnectionRateLimiter rateLimiter;
     private final Wal wal;
     private final MetricsServer metricsServer;
     private final JvmGcMetrics jvmGcMetrics;
+    private final Config config;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     public Application(Path configPath) {
-        Config config = new ConfigLoader().load(configPath);
+        this.config = new ConfigLoader().load(configPath);
         PrometheusMeterRegistry meterRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
         AtomicInteger activeConnections = new AtomicInteger(0);
         AtomicBoolean isReady = new AtomicBoolean(false);
@@ -68,7 +67,7 @@ public final class Application implements AutoCloseable {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close, "loommq-shutdown"));
         try {
             log.info("Starting LoomMQ");
-            metricsServer.start(METRICS_PORT);
+            metricsServer.start(config.host(), config.metricsPort());
             server.start();
             server.awaitShutdown();
             return 0;

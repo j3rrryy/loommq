@@ -27,7 +27,9 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 public final class MetricsServer {
 
     private static final String METRICS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8";
@@ -50,7 +52,7 @@ public final class MetricsServer {
         }
     }
 
-    public void start(int port) throws InterruptedException {
+    public void start(String host, int port) throws InterruptedException {
         bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
         workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
         ServerBootstrap bootstrap = new ServerBootstrap()
@@ -64,7 +66,8 @@ public final class MetricsServer {
                         ch.pipeline().addLast(new MetricsHandler());
                     }
                 });
-        serverChannel = bootstrap.bind(port).sync().channel();
+        serverChannel = bootstrap.bind(host, port).sync().channel();
+        log.info("Metrics server listening on {}:{}", host, port);
     }
 
     public void stop() {

@@ -1,5 +1,6 @@
 host: "0.0.0.0"
 port: 1883
+metricsPort: 8080
 usersFile: "users.yaml"
 walFile: "data/wal.log"
 rateLimit:

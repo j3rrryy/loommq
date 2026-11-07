@@ -5,7 +5,7 @@
     <img src="https://github.com/j3rrryy/loommq/actions/workflows/main.yml/badge.svg" alt="СI/CD">
   </a>
   <a href="https://codecov.io/gh/j3rrryy/loommq">
-    <img src="https://codecov.io/gh/j3rrryy/loommq/graph/badge.svg?token=PFWPAH79T0" alt="Codecov">
+    <img src="https://codecov.io/gh/j3rrryy/loommq/graph/badge.svg?token=9G38T42U0M" alt="Codecov">
   </a>
   <a href="https://www.oracle.com/java/technologies/downloads/#java25">
     <img src="https://img.shields.io/badge/Java-25-FFD64E.svg" alt="Java 25">
@@ -56,6 +56,7 @@
 ```yaml
 host: "0.0.0.0"               # Адрес, на котором слушает MQTT-порт
 port: 1883                    # MQTT-порт
+metricsPort: 8080             # Порт для Prometheus-метрик и Health Checks
 usersFile: "users.yaml"       # Путь к файлу с пользователями
 walFile: "data/wal.log"       # Путь к Write-Ahead Log
 rateLimit:
