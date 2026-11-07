@@ -3,4 +3,4 @@ name: loommq
 description: Lightweight MQTT 5 message broker
 type: application
 version: 0.1.0
-appVersion: "1.0-SNAPSHOT"
+appVersion: "0.1.0"

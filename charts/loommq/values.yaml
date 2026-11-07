@@ -1,9 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: loommq
+  repository: ghcr.io/j3rrryy/loommq
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: ""
 
 serviceAccount:
   create: true

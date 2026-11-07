@@ -14,7 +14,7 @@ logs:
 	@docker compose logs -f loommq
 
 run: setup
-	@./gradlew run --args="--config config.yaml"
+	@./gradlew run
 
 test:
 	@./gradlew test

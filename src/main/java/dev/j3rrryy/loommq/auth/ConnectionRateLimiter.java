@@ -26,7 +26,7 @@ public final class ConnectionRateLimiter implements AutoCloseable {
             t.setDaemon(true);
             return t;
         });
-        this.cleaner.scheduleAtFixedRate(this::cleanup, 1, 1, TimeUnit.MINUTES);
+        var _ = this.cleaner.scheduleAtFixedRate(this::cleanup, 1, 1, TimeUnit.MINUTES);
     }
 
     public boolean isAllowed(String ip) {

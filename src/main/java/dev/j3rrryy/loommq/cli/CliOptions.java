@@ -9,12 +9,12 @@ import picocli.CommandLine;
 @CommandLine.Command(
         name = "loommq",
         mixinStandardHelpOptions = true,
-        version = "LoomMQ 1.0-SNAPSHOT",
+        version = "LoomMQ 0.1.0",
         description = "Lightweight MQTT 5 message broker"
 )
 public final class CliOptions implements Callable<Integer> {
 
-    @CommandLine.Option(names = {"-c", "--config"}, description = "Path to config file")
+    @CommandLine.Option(names = {"-c", "--config"}, description = "Path to config file", defaultValue = "config.yaml")
     private Path configPath;
 
     @Override
