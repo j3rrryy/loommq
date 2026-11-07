@@ -1,0 +1,14 @@
+LoomMQ installed successfully!
+
+To connect an MQTT 5 client to the broker:
+  kubectl port-forward svc/{{ include "loommq.fullname" . }} {{ .Values.service.mqttPort }}:{{ .Values.service.mqttPort }} -n {{ .Release.Namespace }}
+
+To view Prometheus metrics:
+  kubectl port-forward svc/{{ include "loommq.fullname" . }} {{ .Values.service.metricsPort }}:{{ .Values.service.metricsPort }} -n {{ .Release.Namespace }}
+  curl http://localhost:{{ .Values.service.metricsPort }}/metrics
+
+To run the test connection:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Default bootstrap admin user: admin
+Default password is retrieved from the Secret '{{ default (printf "%s-secret" (include "loommq.fullname" .)) .Values.existingSecret }}'.

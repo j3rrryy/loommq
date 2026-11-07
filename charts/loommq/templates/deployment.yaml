@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "loommq.fullname" . }}
+  labels:
+    {{- include "loommq.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "loommq.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- if and (not .Values.existingConfigMap) .Values.config }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- if not .Values.existingSecret }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+      labels:
+        {{- include "loommq.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "loommq.fullname" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: mqtt
+              containerPort: {{ .Values.service.mqttPort }}
+            - name: metrics
+              containerPort: {{ .Values.service.metricsPort }}
+          env:
+            - name: JAVA_OPTS
+              value: {{ .Values.javaOpts | quote }}
+            {{- if not .Values.existingSecret }}
+            - name: LOOMMQ_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "loommq.fullname" . }}-secret
+                  key: bootstrap-username
+            - name: LOOMMQ_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "loommq.fullname" . }}-secret
+                  key: bootstrap-password
+            {{- end }}
+          volumeMounts:
+            {{- if or .Values.existingConfigMap .Values.config }}
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            {{- end }}
+            {{- if .Values.existingSecret }}
+            - name: users
+              mountPath: /app/users.yaml
+              subPath: users.yaml
+            {{- end }}
+            - name: data
+              mountPath: /app/data
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: metrics
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: metrics
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.existingConfigMap }}
+        - name: config
+          configMap:
+            name: {{ .Values.existingConfigMap }}
+        {{- else if .Values.config }}
+        - name: config
+          configMap:
+            name: {{ include "loommq.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.existingSecret }}
+        - name: users
+          secret:
+            secretName: {{ .Values.existingSecret }}
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "loommq.fullname" . }}-data
+        {{- else }}
+        - name: data
+          emptyDir: { }
+        {{- end }}
