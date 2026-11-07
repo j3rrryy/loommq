@@ -1,5 +1,7 @@
 package dev.j3rrryy.loommq.auth;
 
+import java.nio.charset.StandardCharsets;
+
 import dev.j3rrryy.loommq.broker.routing.SubscriptionRegistry;
 import dev.j3rrryy.loommq.broker.session.Session;
 import dev.j3rrryy.loommq.broker.session.SessionRegistry;
@@ -10,11 +12,15 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttConnectMessage;
+import io.netty.handler.codec.mqtt.MqttConnectReturnCode;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttVersion;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
-
-import java.nio.charset.StandardCharsets;
 
 @Slf4j
 public final class AuthenticationHandler extends SimpleChannelInboundHandler<MqttMessage> {
@@ -29,8 +35,9 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private final MeterRegistry meterRegistry;
     private final Counter rateLimitedCounter;
 
-    public AuthenticationHandler(UserStore userStore, ConnectionRateLimiter rateLimiter, SessionRegistry sessionRegistry,
-                                 SubscriptionRegistry subscriptionRegistry, MeterRegistry meterRegistry) {
+    public AuthenticationHandler(UserStore userStore, ConnectionRateLimiter rateLimiter,
+                                 SessionRegistry sessionRegistry, SubscriptionRegistry subscriptionRegistry,
+                                 MeterRegistry meterRegistry) {
         this.userStore = userStore;
         this.rateLimiter = rateLimiter;
         this.sessionRegistry = sessionRegistry;
@@ -96,7 +103,8 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
         );
     }
 
-    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect, String clientId, boolean generatedClientId) {
+    private void onAuthenticated(ChannelHandlerContext ctx, User user, MqttConnectMessage connect,
+                                 String clientId, boolean generatedClientId) {
         ctx.channel().attr(USER_KEY).set(user);
         boolean cleanStart = connect.variableHeader().isCleanSession();
         int sessionExpiry = getSessionExpiry(connect);
@@ -129,7 +137,8 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
             );
             ctx.channel().attr(WillMessage.WILL_KEY).set(will);
         }
-        log.info("Authenticated user={} clientId={} from {}", user.username(), clientId, NetworkUtils.remoteAddress(ctx.channel()));
+        log.info("Authenticated user={} clientId={} from {}", user.username(),
+                clientId, NetworkUtils.remoteAddress(ctx.channel()));
 
         MqttProperties connAckProps = MqttProperties.NO_PROPERTIES;
         if (generatedClientId) {
@@ -148,7 +157,8 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private int getSessionExpiry(MqttConnectMessage connect) {
         MqttProperties properties = connect.variableHeader().properties();
         if (properties != null) {
-            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty) properties.getProperty(MqttProperties.SESSION_EXPIRY_INTERVAL);
+            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty)
+                    properties.getProperty(MqttProperties.SESSION_EXPIRY_INTERVAL);
             if (prop != null) {
                 return prop.value();
             }
@@ -159,7 +169,8 @@ public final class AuthenticationHandler extends SimpleChannelInboundHandler<Mqt
     private int getReceiveMaximum(MqttConnectMessage connect) {
         MqttProperties properties = connect.variableHeader().properties();
         if (properties != null) {
-            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty) properties.getProperty(MqttProperties.RECEIVE_MAXIMUM);
+            MqttProperties.IntegerProperty prop = (MqttProperties.IntegerProperty)
+                    properties.getProperty(MqttProperties.RECEIVE_MAXIMUM);
             if (prop != null) {
                 return prop.value();
             }

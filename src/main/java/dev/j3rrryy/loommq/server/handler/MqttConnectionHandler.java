@@ -1,5 +1,8 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
@@ -17,12 +20,13 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttQoS;
 import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public final class MqttConnectionHandler extends SimpleChannelInboundHandler<MqttMessage> {

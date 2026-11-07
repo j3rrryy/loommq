@@ -1,10 +1,10 @@
 package dev.j3rrryy.loommq.cli;
 
-import dev.j3rrryy.loommq.Application;
-import picocli.CommandLine;
-
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
+
+import dev.j3rrryy.loommq.Application;
+import picocli.CommandLine;
 
 @CommandLine.Command(
         name = "loommq",

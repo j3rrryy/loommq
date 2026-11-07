@@ -1,5 +1,13 @@
 package dev.j3rrryy.loommq.broker.routing;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
@@ -7,10 +15,6 @@ import dev.j3rrryy.loommq.broker.topic.TopicMatcher;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.channel.Channel;
-
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public final class SubscriptionRegistry {
 

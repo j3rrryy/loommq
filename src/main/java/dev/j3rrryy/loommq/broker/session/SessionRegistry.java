@@ -1,9 +1,9 @@
 package dev.j3rrryy.loommq.broker.session;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
-
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class SessionRegistry {
 

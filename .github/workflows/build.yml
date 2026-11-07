@@ -1,0 +1,56 @@
+name: Build, Publish Chart
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          TAG_WITHOUT_V=${TAG#v}
+          docker build -t ghcr.io/${{ github.repository }}:$TAG_WITHOUT_V -t ghcr.io/${{ github.repository }}:latest .
+          docker push ghcr.io/${{ github.repository }}:$TAG_WITHOUT_V
+          docker push ghcr.io/${{ github.repository }}:latest
+
+  publish_chart:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: "latest"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package and push Helm chart
+        run: |
+          helm package ./charts/loommq --destination ./
+          helm push loommq-*.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

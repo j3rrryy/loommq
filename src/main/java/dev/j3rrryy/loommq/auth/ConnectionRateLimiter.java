@@ -1,9 +1,12 @@
 package dev.j3rrryy.loommq.auth;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import dev.j3rrryy.loommq.config.Config;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.concurrent.*;
 
 @Slf4j
 public final class ConnectionRateLimiter implements AutoCloseable {

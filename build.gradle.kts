@@ -1,6 +1,9 @@
 plugins {
     id("java")
     id("application")
+    id("jacoco")
+    id("checkstyle")
+    id("net.ltgt.errorprone") version "5.2.0"
 }
 
 group = "dev.j3rrryy"
@@ -35,6 +38,7 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus:1.17.2")
     compileOnly("org.projectlombok:lombok:1.18.48")
     annotationProcessor("org.projectlombok:lombok:1.18.48")
+    errorprone("com.google.errorprone:error_prone_core:2.52.0")
     testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.27.7")
@@ -46,8 +50,27 @@ application {
     applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 }
 
+jacoco {
+    toolVersion = "0.8.16"
+}
+
+checkstyle {
+    toolVersion = "14.4.0"
+    configFile = file("config/checkstyle/checkstyle.xml")
+    isIgnoreFailures = false
+    maxWarnings = 0
+}
+
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+    }
 }
 
 tasks.withType<JavaCompile> {

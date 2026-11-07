@@ -1,9 +1,9 @@
 package dev.j3rrryy.loommq.server;
 
-import io.netty.channel.Channel;
-
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+
+import io.netty.channel.Channel;
 
 public final class NetworkUtils {
 

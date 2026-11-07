@@ -1,5 +1,9 @@
 package dev.j3rrryy.loommq;
 
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.j3rrryy.loommq.auth.ConnectionRateLimiter;
 import dev.j3rrryy.loommq.auth.UserStore;
 import dev.j3rrryy.loommq.auth.YamlUserStore;
@@ -12,15 +16,14 @@ import dev.j3rrryy.loommq.server.MqttServer;
 import dev.j3rrryy.loommq.wal.FileWal;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.binder.jvm.*;
+import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-
-import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public final class Application implements AutoCloseable {

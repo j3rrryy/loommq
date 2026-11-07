@@ -1,5 +1,9 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
@@ -12,13 +16,20 @@ import dev.j3rrryy.loommq.server.NetworkUtils;
 import dev.j3rrryy.loommq.wal.Wal;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageIdAndPropertiesVariableHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
+import io.netty.handler.codec.mqtt.MqttSubAckMessage;
+import io.netty.handler.codec.mqtt.MqttSubAckPayload;
+import io.netty.handler.codec.mqtt.MqttSubscribeMessage;
+import io.netty.handler.codec.mqtt.MqttTopicSubscription;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -82,7 +93,8 @@ public final class SubscribeHandler extends SimpleChannelInboundHandler<MqttSubs
 
     private long getReplayOffset(MqttSubscribeMessage msg) {
         MqttProperties props = msg.idAndPropertiesVariableHeader().properties();
-        MqttProperties.UserProperties userProps = (MqttProperties.UserProperties) props.getProperty(MqttProperties.USER_PROPERTY);
+        MqttProperties.UserProperties userProps = (MqttProperties.UserProperties)
+                props.getProperty(MqttProperties.USER_PROPERTY);
         if (userProps != null) {
             for (MqttProperties.StringPair pair : userProps.value()) {
                 if ("replay-from-offset".equals(pair.key)) {

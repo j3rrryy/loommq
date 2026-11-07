@@ -1,17 +1,32 @@
 package dev.j3rrryy.loommq.server;
 
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioIoHandler;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.*;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.HttpVersion;
 
 public final class MetricsServer {
 
@@ -68,25 +83,28 @@ public final class MetricsServer {
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) {
             if (!HttpMethod.GET.equals(request.method())) {
-                sendResponse(ctx, request, HttpResponseStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", HttpHeaderValues.TEXT_PLAIN.toString());
+                sendResponse(ctx, request, HttpResponseStatus.METHOD_NOT_ALLOWED,
+                        "Method Not Allowed", HttpHeaderValues.TEXT_PLAIN.toString());
                 return;
             }
 
             String uri = request.uri();
             switch (uri) {
-                case "/metrics" ->
-                        sendResponse(ctx, request, HttpResponseStatus.OK, meterRegistry.scrape(), METRICS_CONTENT_TYPE);
-                case "/health/live" ->
-                        sendResponse(ctx, request, HttpResponseStatus.OK, "OK", HttpHeaderValues.TEXT_PLAIN.toString());
+                case "/metrics" -> sendResponse(ctx, request, HttpResponseStatus.OK,
+                        meterRegistry.scrape(), METRICS_CONTENT_TYPE);
+                case "/health/live" -> sendResponse(ctx, request, HttpResponseStatus.OK,
+                        "OK", HttpHeaderValues.TEXT_PLAIN.toString());
                 case "/health/ready" -> {
                     if (isReady.get()) {
-                        sendResponse(ctx, request, HttpResponseStatus.OK, "OK", HttpHeaderValues.TEXT_PLAIN.toString());
+                        sendResponse(ctx, request, HttpResponseStatus.OK,
+                                "OK", HttpHeaderValues.TEXT_PLAIN.toString());
                     } else {
-                        sendResponse(ctx, request, HttpResponseStatus.SERVICE_UNAVAILABLE, "Not Ready", HttpHeaderValues.TEXT_PLAIN.toString());
+                        sendResponse(ctx, request, HttpResponseStatus.SERVICE_UNAVAILABLE,
+                                "Not Ready", HttpHeaderValues.TEXT_PLAIN.toString());
                     }
                 }
-                case null, default ->
-                        sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND, "Not Found", HttpHeaderValues.TEXT_PLAIN.toString());
+                case null, default -> sendResponse(ctx, request, HttpResponseStatus.NOT_FOUND,
+                        "Not Found", HttpHeaderValues.TEXT_PLAIN.toString());
             }
         }
 

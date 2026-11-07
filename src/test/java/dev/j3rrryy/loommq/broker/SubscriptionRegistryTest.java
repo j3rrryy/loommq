@@ -1,5 +1,10 @@
 package dev.j3rrryy.loommq.broker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
 import dev.j3rrryy.loommq.broker.retained.RetainedDelivery;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
 import dev.j3rrryy.loommq.broker.routing.Delivery;
@@ -11,11 +16,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class SubscriptionRegistryTest {
 

@@ -1,9 +1,9 @@
 package dev.j3rrryy.loommq.config;
 
-import tools.jackson.dataformat.yaml.YAMLMapper;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
 public final class ConfigLoader {
 

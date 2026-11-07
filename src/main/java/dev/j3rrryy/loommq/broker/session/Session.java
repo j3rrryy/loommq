@@ -1,13 +1,13 @@
 package dev.j3rrryy.loommq.broker.session;
 
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.netty.handler.codec.mqtt.MqttPublishMessage;
-
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
 
 public final class Session {
 

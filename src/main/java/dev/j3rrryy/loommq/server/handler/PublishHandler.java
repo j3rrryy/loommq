@@ -1,5 +1,8 @@
 package dev.j3rrryy.loommq.server.handler;
 
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import dev.j3rrryy.loommq.auth.AuthenticationHandler;
 import dev.j3rrryy.loommq.auth.User;
 import dev.j3rrryy.loommq.broker.retained.RetainedMessage;
@@ -16,11 +19,18 @@ import io.micrometer.core.instrument.Timer;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.mqtt.*;
+import io.netty.handler.codec.mqtt.MqttFixedHeader;
+import io.netty.handler.codec.mqtt.MqttMessage;
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+import io.netty.handler.codec.mqtt.MqttMessageFactory;
+import io.netty.handler.codec.mqtt.MqttMessageIdVariableHeader;
+import io.netty.handler.codec.mqtt.MqttMessageType;
+import io.netty.handler.codec.mqtt.MqttProperties;
+import io.netty.handler.codec.mqtt.MqttPubReplyMessageVariableHeader;
+import io.netty.handler.codec.mqtt.MqttPublishMessage;
+import io.netty.handler.codec.mqtt.MqttQoS;
+import io.netty.handler.codec.mqtt.MqttReasonCodes;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublishMessage> {
@@ -40,7 +50,8 @@ public final class PublishHandler extends SimpleChannelInboundHandler<MqttPublis
     private final Timer walAppendTimer;
     private final Timer deliveryTimer;
 
-    public PublishHandler(SubscriptionRegistry registry, Qos2Handler qos2Handler, Wal wal, MeterRegistry meterRegistry) {
+    public PublishHandler(SubscriptionRegistry registry, Qos2Handler qos2Handler,
+                          Wal wal, MeterRegistry meterRegistry) {
         this.registry = registry;
         this.qos2Handler = qos2Handler;
         this.wal = wal;

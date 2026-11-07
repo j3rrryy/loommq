@@ -1,9 +1,9 @@
 package dev.j3rrryy.loommq.broker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import dev.j3rrryy.loommq.broker.topic.TopicFilterValidator;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class TopicFilterValidatorTest {
 
